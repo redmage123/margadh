@@ -1,0 +1,175 @@
+# AI Marketing Director - Python Project Configuration
+# WHY: Centralizes tool configuration for consistency across development
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ai-marketing-director"
+version = "0.1.0"
+description = "Multi-agent AI marketing automation system"
+requires-python = ">=3.12"
+
+# ============================================================================
+# Black - Code Formatting
+# ============================================================================
+[tool.black]
+line-length = 88
+target-version = ['py312']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  # directories
+  \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | build
+  | dist
+  | alembic/versions
+)/
+'''
+
+# ============================================================================
+# isort - Import Sorting
+# ============================================================================
+[tool.isort]
+profile = "black"
+line_length = 88
+multi_line_output = 3
+include_trailing_comma = true
+force_grid_wrap = 0
+use_parentheses = true
+ensure_newline_before_comments = true
+skip_gitignore = true
+skip = [".venv", "build", "dist", "alembic/versions"]
+
+# ============================================================================
+# mypy - Static Type Checking
+# ============================================================================
+[tool.mypy]
+python_version = "3.12"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_any_unimported = false
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+check_untyped_defs = true
+strict_equality = true
+
+# Per-module options
+[[tool.mypy.overrides]]
+module = "tests.*"
+disallow_untyped_defs = false
+
+[[tool.mypy.overrides]]
+module = "alembic.*"
+ignore_errors = true
+
+# ============================================================================
+# pytest - Testing
+# ============================================================================
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+
+# Markers for different test types
+markers = [
+    "unit: Unit tests (fast, isolated, mocked dependencies)",
+    "integration: Integration tests (real dependencies, slower)",
+    "e2e: End-to-end tests (complete workflows, slowest)",
+    "regression: Regression tests (ensure no behavior changes)",
+    "lint: Code quality tests (formatting, types, standards)",
+    "slow: Tests that take significant time to run",
+]
+
+# Coverage settings
+addopts = [
+    "-ra",                          # Show summary of all test outcomes
+    "--strict-markers",             # Error on unknown markers
+    "--strict-config",              # Error on unknown config
+    "--showlocals",                 # Show local variables in tracebacks
+    "--tb=short",                   # Shorter traceback format
+]
+
+# ============================================================================
+# pytest-cov - Coverage
+# ============================================================================
+[tool.coverage.run]
+source = ["agents", "infrastructure", "api", "core", "services"]
+omit = [
+    "*/tests/*",
+    "*/test_*.py",
+    "*/__pycache__/*",
+    "*/alembic/*",
+    "*/migrations/*",
+]
+
+[tool.coverage.report]
+precision = 2
+show_missing = true
+skip_covered = false
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if TYPE_CHECKING:",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "@abstractmethod",
+    "@abc.abstractmethod",
+    "\\.\\.\\.",
+]
+
+[tool.coverage.html]
+directory = "htmlcov"
+
+# ============================================================================
+# pylint - Code Quality
+# ============================================================================
+[tool.pylint.main]
+py-version = "3.12"
+jobs = 0  # Auto-detect CPU cores
+fail-under = 8.0  # Minimum score
+
+[tool.pylint.messages_control]
+disable = [
+    "C0114",  # missing-module-docstring (we use top-level docstring)
+    "C0115",  # missing-class-docstring (sometimes obvious)
+    "C0116",  # missing-function-docstring (sometimes obvious)
+    "R0903",  # too-few-public-methods (dataclasses, configs)
+    "R0913",  # too-many-arguments (common in constructors)
+    "W0212",  # protected-access (needed for testing)
+]
+
+[tool.pylint.format]
+max-line-length = 88
+
+[tool.pylint.design]
+max-args = 7
+max-attributes = 10
+max-bool-expr = 5
+max-branches = 12
+max-locals = 15
+max-parents = 7
+max-public-methods = 20
+max-returns = 6
+max-statements = 50
+min-public-methods = 1
+
+[tool.pylint.similarities]
+min-similarity-lines = 4
+ignore-comments = true
+ignore-docstrings = true
+ignore-imports = true

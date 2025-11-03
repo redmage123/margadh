@@ -1,0 +1,87 @@
+# Flake8 configuration
+# WHY: Fast linter for style guide enforcement (PEP 8)
+# HOW: Place in project root, run with: flake8 agents/ infrastructure/
+
+[flake8]
+# Maximum line length
+max-line-length = 100
+
+# Maximum complexity (cyclomatic complexity)
+max-complexity = 10
+
+# Exclude directories from linting
+exclude =
+    .git,
+    __pycache__,
+    .venv,
+    venv,
+    build,
+    dist,
+    *.egg-info,
+    .tox,
+    .pytest_cache,
+    .mypy_cache,
+    htmlcov,
+    node_modules,
+    migrations
+
+# Error codes to ignore
+ignore =
+    # E203: whitespace before ':' (conflicts with black)
+    E203,
+    # W503: line break before binary operator (conflicts with black)
+    W503,
+    # E501: line too long (handled by black)
+    E501,
+
+# Error codes to select (explicit)
+select =
+    # Errors
+    E,
+    # Warnings
+    W,
+    # Pyflakes errors
+    F,
+    # McCabe complexity
+    C,
+
+# Per-file ignores
+per-file-ignores =
+    # __init__.py files can have unused imports
+    __init__.py:F401,
+    # Test files can have unused imports and long lines
+    test_*.py:F401,E501,
+    # Settings files can have long lines
+    settings.py:E501,
+    # Configuration files can have long lines
+    config.py:E501,
+
+# Show source code for each error
+show-source = True
+
+# Show statistics for error types
+statistics = True
+
+# Count errors
+count = True
+
+# Use multiple workers for faster linting
+jobs = auto
+
+# RUNNING FLAKE8
+# ==============
+#
+# Check all code:
+#   flake8
+#
+# Check specific directory:
+#   flake8 agents/
+#
+# Check specific file:
+#   flake8 agents/cmo_agent.py
+#
+# Show statistics:
+#   flake8 --statistics
+#
+# Output to file:
+#   flake8 --output-file=flake8_report.txt

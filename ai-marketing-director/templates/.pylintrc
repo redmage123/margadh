@@ -1,0 +1,130 @@
+# Pylint configuration
+# WHY: Enforces code quality standards and catches potential bugs
+# HOW: Place in project root, run with: pylint agents/ infrastructure/
+
+[MASTER]
+# Use multiple processes for faster linting
+jobs=0
+
+# Pickle collected data for comparisons
+persistent=yes
+
+# Allow loading of arbitrary C extensions
+unsafe-load-any-extension=no
+
+# List of plugins (as comma separated values)
+load-plugins=
+
+# Discover python modules and packages in the file system subtree
+recursive=yes
+
+[MESSAGES CONTROL]
+# Disable specific warnings (with justification)
+disable=
+    # Disabled with justification:
+    C0111,  # missing-docstring: We enforce docstrings via other means
+    R0903,  # too-few-public-methods: Dataclasses often have few methods
+    W0511,  # fixme: TODOs are acceptable during development
+
+    # Consider enabling these after initial development:
+    # R0913,  # too-many-arguments
+    # R0914,  # too-many-locals
+
+[REPORTS]
+# Set the output format
+output-format=colorized
+
+# Tells whether to display a full report or only the messages
+reports=yes
+
+# Python expression which should return a score less than 10
+evaluation=10.0 - ((float(5 * error + warning + refactor + convention) / statement) * 10)
+
+# Template for score report
+score=yes
+
+[BASIC]
+# Good variable names regexes
+good-names=i,j,k,ex,Run,_,id,db,llm,vp
+
+# Bad variable names regexes
+bad-names=foo,bar,baz,toto,tutu,tata
+
+# Naming conventions
+argument-naming-style=snake_case
+attr-naming-style=snake_case
+class-attribute-naming-style=snake_case
+class-naming-style=PascalCase
+const-naming-style=UPPER_CASE
+function-naming-style=snake_case
+method-naming-style=snake_case
+module-naming-style=snake_case
+variable-naming-style=snake_case
+
+# Minimum line length for functions/classes
+docstring-min-length=10
+
+[FORMAT]
+# Maximum number of characters on a single line
+max-line-length=100
+
+# Maximum number of lines in a module
+max-module-lines=1000
+
+# String used to indent
+indent-string='    '
+
+# Number of spaces of indent required
+indent-after-paren=4
+
+[DESIGN]
+# Maximum number of arguments for function / method
+max-args=7
+
+# Maximum number of attributes for a class
+max-attributes=10
+
+# Maximum number of boolean expressions in an if statement
+max-bool-expr=5
+
+# Maximum number of branch for function / method body
+max-branches=12
+
+# Maximum number of locals for function / method body
+max-locals=20
+
+# Maximum number of parents for a class
+max-parents=7
+
+# Maximum number of public methods for a class
+max-public-methods=20
+
+# Maximum number of return / yield for function / method body
+max-returns=6
+
+# Maximum number of statements in function / method body
+max-statements=50
+
+# Minimum number of public methods for a class
+min-public-methods=0
+
+[IMPORTS]
+# Deprecated modules which should not be used
+deprecated-modules=optparse,tkinter.tix
+
+# Force import order to recognize a module as part of a third party library
+known-third-party=anthropic,redis,fastapi,pydantic
+
+[CLASSES]
+# List of method names used to declare instance attributes
+defining-attr-methods=__init__,__new__,setUp
+
+# List of valid names for the first argument in a class method
+valid-classmethod-first-arg=cls
+
+# List of valid names for the first argument in a metaclass class method
+valid-metaclass-classmethod-first-arg=mcs
+
+[EXCEPTIONS]
+# Exceptions that will emit a warning when caught
+overgeneral-exceptions=builtins.Exception

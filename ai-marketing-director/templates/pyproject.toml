@@ -1,0 +1,161 @@
+# pyproject.toml - Python project configuration
+# WHY: Central configuration for black, isort, and other tools
+# HOW: Place in project root
+
+[tool.black]
+# WHY: Black is the uncompromising Python code formatter
+# HOW: Run with: black agents/ infrastructure/
+line-length = 100
+target-version = ['py312']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+    # Directories to exclude
+    \.git
+    | \.mypy_cache
+    | \.pytest_cache
+    | \.tox
+    | \.venv
+    | venv
+    | build
+    | dist
+    | __pycache__
+    | migrations
+)/
+'''
+
+[tool.isort]
+# WHY: Isort sorts imports automatically
+# HOW: Run with: isort agents/ infrastructure/
+profile = "black"
+line_length = 100
+multi_line_output = 3
+include_trailing_comma = true
+force_grid_wrap = 0
+use_parentheses = true
+ensure_newline_before_comments = true
+skip_glob = [
+    "*/migrations/*",
+    "*/__pycache__/*",
+    "*/venv/*",
+    "*/.venv/*"
+]
+
+# Import order sections
+sections = [
+    "FUTURE",
+    "STDLIB",
+    "THIRDPARTY",
+    "FIRSTPARTY",
+    "LOCALFOLDER"
+]
+
+# Known third party packages
+known_third_party = [
+    "anthropic",
+    "redis",
+    "fastapi",
+    "pydantic",
+    "pytest",
+    "langchain",
+    "langgraph"
+]
+
+[tool.coverage.run]
+# WHY: Configure code coverage measurement
+# HOW: Automatically used by pytest-cov
+source = ["agents", "infrastructure", "api"]
+omit = [
+    "*/tests/*",
+    "*/test_*.py",
+    "*/__init__.py",
+    "*/migrations/*",
+    "*/.venv/*",
+    "*/venv/*"
+]
+branch = true
+
+[tool.coverage.report]
+# Coverage reporting settings
+precision = 2
+show_missing = true
+skip_covered = false
+exclude_lines = [
+    # Standard pragmas
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    # Type checking blocks
+    "if TYPE_CHECKING:",
+    "if typing.TYPE_CHECKING:",
+    # Abstract methods
+    "@abstractmethod",
+    "@abc.abstractmethod",
+    # Defensive programming
+    "except ImportError:",
+]
+
+[tool.coverage.html]
+# HTML coverage report
+directory = "htmlcov"
+
+[tool.pytest.ini_options]
+# Pytest configuration (can also be in pytest.ini)
+# WHY: Alternative to pytest.ini
+minversion = "7.0"
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "-v",
+    "-ra",
+    "--strict-markers",
+    "--cov=agents",
+    "--cov=infrastructure",
+    "--cov=api",
+    "--cov-report=html",
+    "--cov-report=term-missing",
+]
+
+# RUNNING CODE FORMATTERS AND LINTERS
+# ====================================
+#
+# Format all code with black:
+#   black .
+#
+# Check what black would change (without modifying):
+#   black --check .
+#
+# Sort imports with isort:
+#   isort .
+#
+# Check import order (without modifying):
+#   isort --check-only .
+#
+# Run all linters in sequence:
+#   black . && isort . && flake8 && pylint agents/ && mypy .
+#
+# RECOMMENDED PRE-COMMIT WORKFLOW
+# ===============================
+#
+# 1. Format code:
+#    black .
+#    isort .
+#
+# 2. Check style:
+#    flake8
+#
+# 3. Check types:
+#    mypy .
+#
+# 4. Check quality:
+#    pylint agents/
+#
+# 5. Run tests:
+#    pytest
+#
+# 6. Commit if all pass:
+#    git commit -m "Your message"

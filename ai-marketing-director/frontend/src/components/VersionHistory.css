@@ -1,0 +1,470 @@
+/**
+ * Version History Component Styles
+ * Provides styling for version history with diff view and restore functionality
+ */
+
+/* Version History Container */
+.version-history {
+  background: var(--card-bg);
+  border-radius: var(--radius);
+  padding: 1.5rem;
+  margin-top: 2rem;
+}
+
+.version-history-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.version-history-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--text);
+  margin: 0;
+}
+
+/* Compare Actions */
+.compare-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.compare-status {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+/* Version List */
+.version-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.version-history-loading,
+.version-history-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  padding: 3rem 1rem;
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+.version-history-loading svg {
+  color: var(--primary);
+}
+
+.version-history-empty svg {
+  opacity: 0.5;
+}
+
+/* Version Item */
+.version-item {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1rem;
+  transition: all 0.2s;
+}
+
+.version-item:hover {
+  border-color: var(--primary);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.version-item.version-current {
+  border-color: var(--success);
+  background: var(--success-bg);
+}
+
+.version-item.version-selected {
+  border-color: var(--primary);
+  background: var(--primary-bg);
+}
+
+.version-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.version-checkbox {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  accent-color: var(--primary);
+}
+
+.version-badge {
+  flex-shrink: 0;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--primary);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.875rem;
+}
+
+.version-current .version-badge {
+  background: var(--success);
+}
+
+.version-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.version-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.25rem;
+}
+
+.version-author {
+  font-weight: 600;
+  color: var(--text);
+  font-size: 0.875rem;
+}
+
+.version-time {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.version-current-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.125rem 0.5rem;
+  background: var(--success);
+  color: white;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.version-summary {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  margin-top: 0.25rem;
+  font-style: italic;
+}
+
+/* Version Actions */
+.version-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-left: auto;
+}
+
+.version-action-btn {
+  background: none;
+  border: none;
+  padding: 0.5rem;
+  cursor: pointer;
+  color: var(--text-secondary);
+  border-radius: var(--radius);
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.version-action-btn:hover {
+  background: var(--hover-bg);
+  color: var(--primary);
+}
+
+.version-chevron-expanded {
+  transform: rotate(90deg);
+}
+
+/* Version Details */
+.version-details {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+.version-detail-section {
+  margin-bottom: 1rem;
+}
+
+.version-detail-section:last-child {
+  margin-bottom: 0;
+}
+
+.version-detail-section h4 {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  margin: 0 0 0.5rem 0;
+  letter-spacing: 0.05em;
+}
+
+.version-detail-section p {
+  margin: 0;
+  color: var(--text);
+  font-size: 0.875rem;
+  line-height: 1.6;
+}
+
+.version-content-preview {
+  color: var(--text);
+  font-size: 0.875rem;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  background: var(--card-bg);
+  padding: 0.75rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+}
+
+.version-metadata {
+  margin: 0;
+  padding: 0.75rem;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 0.75rem;
+  color: var(--text);
+  overflow-x: auto;
+}
+
+/* Diff View */
+.version-diff-view {
+  background: var(--card-bg);
+  border-radius: var(--radius);
+  padding: 1.5rem;
+  margin-top: 2rem;
+}
+
+.diff-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.diff-header h3 {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--text);
+  margin: 0;
+}
+
+.diff-versions-info {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.diff-version-card {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.diff-content {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.5rem;
+}
+
+.diff-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  padding: 3rem 1rem;
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+.diff-empty svg {
+  color: var(--success);
+}
+
+.diff-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+/* Diff Item */
+.diff-item {
+  padding: 1rem;
+  border-radius: var(--radius);
+  border-left: 4px solid;
+}
+
+.diff-item.diff-added {
+  border-left-color: var(--success);
+  background: var(--success-bg);
+}
+
+.diff-item.diff-removed {
+  border-left-color: var(--error);
+  background: var(--error-bg);
+}
+
+.diff-item.diff-modified {
+  border-left-color: var(--warning);
+  background: var(--warning-bg);
+}
+
+.diff-field {
+  font-weight: 600;
+  font-size: 0.875rem;
+  color: var(--text);
+  margin-bottom: 0.75rem;
+  text-transform: capitalize;
+}
+
+.diff-changes {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.diff-old,
+.diff-new {
+  flex: 1;
+  min-width: 200px;
+}
+
+.diff-label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  margin-bottom: 0.5rem;
+  letter-spacing: 0.05em;
+}
+
+.diff-old .diff-label {
+  color: var(--error);
+}
+
+.diff-new .diff-label {
+  color: var(--success);
+}
+
+.diff-old pre,
+.diff-new pre {
+  margin: 0;
+  padding: 0.75rem;
+  background: var(--card-bg);
+  border-radius: var(--radius);
+  font-size: 0.875rem;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+.diff-old pre {
+  border: 1px solid var(--error);
+  color: var(--error);
+}
+
+.diff-new pre {
+  border: 1px solid var(--success);
+  color: var(--success);
+}
+
+.diff-arrow {
+  flex-shrink: 0;
+  color: var(--text-secondary);
+}
+
+/* Animations */
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .version-history,
+  .version-diff-view {
+    padding: 1rem;
+  }
+
+  .version-history-header,
+  .diff-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .compare-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .version-header {
+    flex-wrap: wrap;
+  }
+
+  .version-badge {
+    width: 40px;
+    height: 40px;
+    font-size: 0.75rem;
+  }
+
+  .version-actions {
+    width: 100%;
+    justify-content: flex-end;
+    margin-left: 0;
+    margin-top: 0.5rem;
+  }
+
+  .diff-changes {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .diff-arrow {
+    transform: rotate(90deg);
+  }
+}
