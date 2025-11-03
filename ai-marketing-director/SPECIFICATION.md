@@ -8976,6 +8976,1156 @@ The VP Marketing Agent tracks key operational performance indicators:
 
 ---
 
+### 4.13 Director of Communications Agent (Executive Layer)
+
+**Purpose**: Executive-layer agent responsible for brand voice consistency, messaging strategy, public relations, and crisis communications across all marketing channels. Acts as the brand guardian ensuring all communications align with organizational values and voice.
+
+**Reports To:** CMO Agent (strategic brand direction, crisis escalation)
+
+**Supervises:** Brand voice compliance across all content-producing agents (Content Manager, Copywriter, Social Media Manager, Campaign Manager)
+
+**Coordinates With:** VP Marketing (campaign messaging approval), Content Manager (editorial brand alignment), Copywriter (brand voice training), Market Research (sentiment analysis)
+
+**Role in Hierarchy:** Executive Layer - sets brand voice standards, approves messaging strategy, manages crisis communications, ensures brand consistency across all channels.
+
+---
+
+#### 4.13.1 Core Responsibilities
+
+1. **Brand Voice Guardianship**: Ensure all communications reflect brand personality, tone, and values
+2. **Messaging Strategy**: Develop and approve messaging frameworks for campaigns and initiatives
+3. **Crisis Communications**: Lead rapid response to PR crises and brand reputation threats
+4. **Brand Guidelines**: Define and maintain comprehensive brand voice and messaging standards
+5. **PR Oversight**: Review and approve press releases, public statements, and external communications
+6. **Cross-Channel Consistency**: Coordinate messaging to ensure consistency across all platforms
+7. **Brand Sentiment Monitoring**: Track brand perception and sentiment trends across channels
+8. **Training & Compliance**: Train agents on brand standards and audit compliance
+9. **Stakeholder Messaging**: Manage messaging for investor relations, partnerships, and strategic announcements
+10. **Reputation Management**: Proactively protect and enhance brand reputation
+
+---
+
+#### 4.13.2 Task Types (Strategy Pattern)
+
+The Director of Communications Agent supports 10 task types, each handled by a dedicated method using the Strategy Pattern (dictionary dispatch, zero if/elif chains):
+
+```python
+self._task_handlers: dict[str, Callable[[Task], Coroutine[Any, Any, dict[str, Any]]]] = {
+    "review_brand_voice": self._review_brand_voice,
+    "approve_messaging": self._approve_messaging,
+    "manage_crisis": self._manage_crisis,
+    "define_brand_guidelines": self._define_brand_guidelines,
+    "review_pr_materials": self._review_pr_materials,
+    "coordinate_messaging": self._coordinate_messaging,
+    "monitor_brand_sentiment": self._monitor_brand_sentiment,
+    "train_brand_voice": self._train_brand_voice,
+    "audit_communications": self._audit_communications,
+    "report_brand_health": self._report_brand_health,
+}
+```
+
+**WHY Strategy Pattern**: Eliminates if/elif chains, makes adding new task types trivial, improves testability.
+
+**HOW**: Dictionary dispatch routes task types to handler methods, each following guard clause pattern.
+
+---
+
+#### 4.13.3 Task Type Specifications
+
+##### 1. review_brand_voice
+
+**Purpose**: Review content or messaging for brand voice consistency and alignment with guidelines.
+
+**Inputs**:
+```python
+{
+    "content_id": str,                     # Required: ID of content to review
+    "content_type": str,                   # Required: "blog_post", "social_post", "email", "press_release"
+    "content_text": str,                   # Required: The actual content text
+    "content_metadata": dict[str, Any],    # Optional: Author, channel, campaign context
+    "review_level": str,                   # Optional: "quick" | "standard" | "comprehensive" (default: "standard")
+    "urgency": str,                        # Optional: "low" | "normal" | "high" | "crisis"
+}
+```
+
+**Process**:
+1. Guard clause: Validate content_id and content_text provided
+2. Retrieve brand guidelines from state
+3. Analyze content against brand voice dimensions:
+   - Tone consistency (professional, friendly, authoritative, etc.)
+   - Voice characteristics (personality traits, values alignment)
+   - Prohibited language (banned terms, negative patterns)
+   - Messaging themes (key messages, value propositions)
+   - Audience appropriateness
+4. Score content on each dimension (0-100 scale)
+5. Calculate overall brand voice score (weighted average)
+6. Generate specific feedback with examples
+7. Guard clause: Auto-approve if score ≥90 and no critical violations
+8. Guard clause: Request revision if score <70 or critical violations found
+9. Return review with score, status, and actionable feedback
+
+**Outputs**:
+```python
+{
+    "content_id": str,
+    "review_status": str,                  # "approved" | "approved_with_notes" | "revision_needed" | "rejected"
+    "brand_voice_score": float,            # 0-100 overall score
+    "dimension_scores": {                  # Individual dimension scores
+        "tone_consistency": float,         # 0-100
+        "voice_characteristics": float,    # 0-100
+        "prohibited_language": float,      # 0-100 (100 = no violations)
+        "messaging_alignment": float,      # 0-100
+        "audience_fit": float,             # 0-100
+    },
+    "feedback": str,                       # Detailed feedback with specific improvements
+    "violations": list[dict[str, Any]],    # List of brand guideline violations
+    "suggestions": list[str],              # Specific improvement suggestions
+    "examples": list[dict[str, str]],      # Before/after examples for improvements
+    "reviewed_by": str,                    # Agent ID
+    "reviewed_at": str,                    # ISO timestamp
+}
+```
+
+**Error Handling**: If LLM analysis fails, fall back to keyword-based brand check with reduced confidence score.
+
+---
+
+##### 2. approve_messaging
+
+**Purpose**: Approve messaging strategy and key messages for campaigns, product launches, or strategic initiatives.
+
+**Inputs**:
+```python
+{
+    "campaign_id": str,                    # Required: Campaign or initiative ID
+    "messaging_framework": dict[str, Any], # Required: Complete messaging structure
+    "target_audience": list[str],          # Required: Target audience segments
+    "channels": list[str],                 # Required: Distribution channels
+    "key_messages": list[str],             # Required: Primary messages (3-5)
+    "supporting_messages": list[str],      # Optional: Secondary messages
+    "tone_guidance": str,                  # Optional: Specific tone requirements
+    "competitive_context": dict[str, Any], # Optional: Competitive positioning
+    "approval_urgency": str,               # Optional: "routine" | "urgent" | "crisis"
+}
+```
+
+**Process**:
+1. Guard clause: Validate required fields (campaign_id, messaging_framework, key_messages)
+2. Analyze messaging framework against brand strategy:
+   - Strategic alignment with brand positioning
+   - Differentiation from competitors
+   - Clarity and memorability
+   - Consistency with existing campaigns
+   - Target audience relevance
+3. Review key messages for:
+   - Brand voice alignment
+   - Message hierarchy (primary vs. supporting)
+   - Channel appropriateness
+   - Call-to-action clarity
+   - Proof points and credibility
+4. Guard clause: Auto-approve if all criteria score ≥85% and no strategic conflicts
+5. Guard clause: Escalate to CMO if major strategic misalignment or brand risk
+6. Provide approval decision with conditions if needed
+7. Store approved messaging in state for consistency tracking
+
+**Outputs**:
+```python
+{
+    "campaign_id": str,
+    "approval_status": str,                # "approved" | "conditional" | "revision_needed" | "escalated"
+    "approval_conditions": list[str],      # Conditions if conditional approval
+    "messaging_score": float,              # 0-100 overall messaging quality
+    "strategic_alignment": float,          # 0-100 alignment with brand strategy
+    "brand_consistency": float,            # 0-100 consistency score
+    "feedback": str,                       # Detailed feedback on messaging
+    "required_changes": list[str],         # Must-fix items for approval
+    "recommended_changes": list[str],      # Nice-to-have improvements
+    "escalation_reason": str,              # If escalated, why
+    "approved_by": str,                    # Agent ID
+    "approved_at": str,                    # ISO timestamp
+    "valid_until": str,                    # Message approval expiration
+}
+```
+
+**Error Handling**: If uncertain about strategic fit, escalate to CMO rather than approving.
+
+---
+
+##### 3. manage_crisis
+
+**Purpose**: Lead rapid response to PR crises, brand reputation threats, or communications emergencies.
+
+**Inputs**:
+```python
+{
+    "crisis_id": str,                      # Required: Unique crisis identifier
+    "crisis_type": str,                    # Required: "product_issue" | "social_backlash" | "executive_statement" | "data_breach" | "legal" | "competitive_attack"
+    "severity": str,                       # Required: "low" | "medium" | "high" | "critical"
+    "description": str,                    # Required: Crisis description
+    "affected_channels": list[str],        # Required: Impacted channels
+    "stakeholders": list[str],             # Required: Who needs to be informed
+    "time_discovered": str,                # Required: When crisis was detected
+    "current_status": str,                 # Optional: Current situation status
+    "evidence": dict[str, Any],            # Optional: Supporting evidence/data
+}
+```
+
+**Process**:
+1. Guard clause: Validate crisis severity and type
+2. Guard clause: Immediate CMO escalation if severity="critical"
+3. Activate crisis protocol based on type:
+   - Retrieve crisis response playbook
+   - Identify response timeline (minutes for critical, hours for high)
+   - Determine approval authority needed
+4. Develop response strategy:
+   - Assess brand risk and impact
+   - Draft holding statement (immediate response)
+   - Develop full response messaging
+   - Identify stakeholder communication plan
+   - Plan channel-specific responses
+5. Coordinate response execution:
+   - Assign response tasks to appropriate agents
+   - Set response timeline and checkpoints
+   - Monitor response effectiveness
+   - Adjust messaging based on reaction
+6. Track crisis lifecycle:
+   - Log all communications
+   - Monitor sentiment shift
+   - Determine resolution criteria
+7. Post-crisis analysis:
+   - Document lessons learned
+   - Update crisis protocols
+   - Report to CMO
+
+**Outputs**:
+```python
+{
+    "crisis_id": str,
+    "response_status": str,                # "activated" | "in_progress" | "contained" | "resolved" | "escalated"
+    "severity_assessment": str,            # Confirmed severity level
+    "response_timeline": dict[str, Any],   # Timeline with milestones
+    "holding_statement": str,              # Immediate public response
+    "full_response": str,                  # Complete response messaging
+    "channel_responses": dict[str, str],   # Channel-specific responses
+    "stakeholder_communications": list[dict[str, Any]],  # Who gets what message when
+    "response_tasks": list[dict[str, Any]],  # Tasks assigned to agents
+    "monitoring_plan": dict[str, Any],     # How crisis is being monitored
+    "escalated_to_cmo": bool,              # Whether CMO involved
+    "estimated_resolution": str,           # Expected resolution timeframe
+    "created_at": str,                     # Crisis response initiated
+}
+```
+
+**Error Handling**: Default to over-escalation (escalate to CMO) rather than under-responding to crisis.
+
+---
+
+##### 4. define_brand_guidelines
+
+**Purpose**: Create and update comprehensive brand voice and messaging guidelines for the organization.
+
+**Inputs**:
+```python
+{
+    "guideline_type": str,                 # Required: "initial" | "update" | "revision"
+    "brand_personality": list[str],        # Required: 3-5 personality traits
+    "tone_attributes": dict[str, Any],     # Required: Tone dimensions and preferences
+    "voice_characteristics": dict[str, Any],  # Required: Voice definition
+    "target_audiences": list[dict[str, Any]],  # Required: Audience personas
+    "prohibited_terms": list[str],         # Optional: Banned words/phrases
+    "preferred_terminology": dict[str, str],  # Optional: Preferred language choices
+    "messaging_pillars": list[str],        # Optional: Core brand themes
+    "examples": dict[str, list[str]],      # Optional: Good/bad examples
+    "update_reason": str,                  # If update, why changing
+}
+```
+
+**Process**:
+1. Guard clause: Validate required brand personality and tone attributes
+2. Guard clause: Escalate to CMO for initial guidelines or major revisions
+3. Analyze existing guidelines if update:
+   - What's changing and why
+   - Impact on existing content
+   - Retraining needs for agents
+4. Structure comprehensive guidelines:
+   - Brand personality definition
+   - Tone and voice spectrum
+   - Do's and don'ts
+   - Channel-specific guidance
+   - Audience-specific variations
+   - Example templates
+5. Create validation framework:
+   - Scoring rubric for content review
+   - Automated check criteria
+   - Edge case handling
+6. Store guidelines in state
+7. Notify all content-producing agents of changes
+8. Schedule brand voice training if significant changes
+
+**Outputs**:
+```python
+{
+    "guidelines_id": str,
+    "version": str,                        # Semantic versioning (e.g., "2.1.0")
+    "brand_guidelines": {
+        "personality": list[str],          # Core personality traits
+        "tone": dict[str, Any],            # Tone dimensions and scales
+        "voice": dict[str, Any],           # Voice characteristics
+        "prohibited": list[str],           # Banned terms
+        "preferred": dict[str, str],       # Preferred terminology
+        "messaging_pillars": list[str],    # Core themes
+        "channel_guidance": dict[str, dict[str, Any]],  # Per-channel rules
+        "audience_variations": dict[str, dict[str, Any]],  # Per-audience adjustments
+        "examples": {
+            "approved": list[str],         # Good examples
+            "disapproved": list[str],      # Bad examples
+        },
+    },
+    "validation_rubric": dict[str, Any],   # How to score content
+    "change_summary": str,                 # What changed from previous version
+    "training_required": bool,             # Whether agents need retraining
+    "impacted_agents": list[str],          # Which agents affected
+    "effective_date": str,                 # When guidelines take effect
+    "created_by": str,
+    "created_at": str,
+}
+```
+
+**Error Handling**: Preserve previous guideline version for rollback if new guidelines cause issues.
+
+---
+
+##### 5. review_pr_materials
+
+**Purpose**: Review and approve press releases, public statements, executive communications, and external PR materials.
+
+**Inputs**:
+```python
+{
+    "material_id": str,                    # Required: Unique ID
+    "material_type": str,                  # Required: "press_release" | "statement" | "announcement" | "investor_update" | "partnership_news"
+    "material_content": str,               # Required: Full content text
+    "distribution_plan": dict[str, Any],   # Required: How/where it will be distributed
+    "approval_urgency": str,               # Required: "routine" | "time_sensitive" | "urgent"
+    "target_audience": list[str],          # Required: Who will see this
+    "legal_approved": bool,                # Optional: Legal team approval status
+    "executive_approved": bool,            # Optional: Executive approval status
+    "embargo_until": str,                  # Optional: Embargo date/time
+    "related_campaign": str,               # Optional: Associated campaign ID
+}
+```
+
+**Process**:
+1. Guard clause: Validate material content and type provided
+2. Guard clause: Ensure legal approval obtained if material_type requires it
+3. Review for brand voice alignment:
+   - Professional tone appropriate for external communications
+   - Brand personality reflected accurately
+   - No prohibited language or risky statements
+4. Review for messaging quality:
+   - Key messages clear and prominent
+   - Supporting facts credible and verifiable
+   - Call-to-action or next steps clear
+   - Contact information accurate
+5. Review for PR best practices:
+   - Headline compelling and newsworthy
+   - Quotes attributable and authentic
+   - Boilerplate current and accurate
+   - Structure follows AP/industry standards
+6. Assess risk factors:
+   - Potential for misinterpretation
+   - Competitive intelligence exposure
+   - Legal or regulatory concerns
+   - Crisis potential
+7. Guard clause: Auto-approve if all scores ≥90 and no risk flags
+8. Guard clause: Escalate to CMO if high-risk or strategic announcement
+9. Provide approval with any required edits
+
+**Outputs**:
+```python
+{
+    "material_id": str,
+    "approval_status": str,                # "approved" | "approved_with_edits" | "revision_needed" | "escalated" | "rejected"
+    "brand_voice_score": float,            # 0-100
+    "messaging_quality_score": float,      # 0-100
+    "pr_standards_score": float,           # 0-100
+    "risk_assessment": {
+        "risk_level": str,                 # "low" | "medium" | "high" | "critical"
+        "risk_factors": list[str],         # Identified risks
+        "mitigation": list[str],           # Risk mitigation recommendations
+    },
+    "required_edits": list[dict[str, Any]],  # Must-fix changes
+    "suggested_improvements": list[str],   # Optional improvements
+    "escalation_reason": str,              # If escalated, why
+    "approved_for_distribution": bool,     # Final approval flag
+    "approved_by": str,
+    "approved_at": str,
+    "valid_until": str,                    # Approval expiration (content may become stale)
+}
+```
+
+**Error Handling**: If uncertain about risk level, default to escalation to CMO.
+
+---
+
+##### 6. coordinate_messaging
+
+**Purpose**: Coordinate messaging across multiple campaigns, channels, and initiatives to ensure consistency and strategic alignment.
+
+**Inputs**:
+```python
+{
+    "coordination_scope": str,             # Required: "campaign" | "product_launch" | "quarter" | "initiative"
+    "campaigns": list[str],                # Required: Campaign IDs to coordinate
+    "timeframe": dict[str, str],           # Required: start_date, end_date
+    "channels": list[str],                 # Required: Channels involved
+    "primary_message": str,                # Required: Overarching message
+    "stakeholders": list[str],             # Required: Who needs aligned messaging
+    "constraints": dict[str, Any],         # Optional: Budget, timing, resource constraints
+}
+```
+
+**Process**:
+1. Guard clause: Validate campaigns and timeframe provided
+2. Analyze current messaging landscape:
+   - Retrieve messaging for all specified campaigns
+   - Identify overlaps and conflicts
+   - Map channel coverage
+3. Develop coordination plan:
+   - Message hierarchy across campaigns
+   - Channel-specific message adaptation
+   - Timing sequence for message rollout
+   - Consistency checkpoints
+4. Identify conflicts:
+   - Contradictory messages
+   - Resource conflicts (same channel, same time)
+   - Tone inconsistencies
+   - Audience overlap issues
+5. Create unified messaging framework:
+   - Primary message prominence
+   - Supporting messages by campaign
+   - Channel-specific guidelines
+   - Cross-campaign terminology standards
+6. Coordinate with VP Marketing and Campaign Manager:
+   - Share coordination plan
+   - Resolve conflicts
+   - Set execution timeline
+7. Monitor messaging consistency during execution
+
+**Outputs**:
+```python
+{
+    "coordination_id": str,
+    "coordination_scope": str,
+    "unified_messaging_framework": {
+        "primary_message": str,
+        "campaign_messages": dict[str, list[str]],  # Per campaign
+        "channel_guidance": dict[str, str],         # Per channel
+        "terminology_standards": dict[str, str],
+        "message_hierarchy": list[str],             # Priority order
+    },
+    "coordination_plan": {
+        "timeline": list[dict[str, Any]],          # Rollout sequence
+        "channel_allocation": dict[str, list[str]], # Channels per campaign
+        "checkpoints": list[dict[str, Any]],       # Consistency reviews
+    },
+    "conflicts_resolved": list[dict[str, Any]],    # Issues identified and resolved
+    "stakeholder_briefings": dict[str, str],       # What each stakeholder needs to know
+    "monitoring_metrics": list[str],               # How to track consistency
+    "created_at": str,
+}
+```
+
+**Error Handling**: If conflicts cannot be resolved at Director level, escalate to CMO for strategic prioritization.
+
+---
+
+##### 7. monitor_brand_sentiment
+
+**Purpose**: Monitor brand perception, sentiment trends, and reputation across channels and platforms.
+
+**Inputs**:
+```python
+{
+    "monitoring_scope": str,               # Required: "realtime" | "daily" | "weekly" | "campaign"
+    "channels": list[str],                 # Required: Channels to monitor
+    "timeframe": dict[str, str],           # Required: start_date, end_date
+    "keywords": list[str],                 # Optional: Brand terms to track
+    "competitors": list[str],              # Optional: Competitors for comparison
+    "alert_threshold": float,              # Optional: Sentiment drop trigger (default: -10%)
+}
+```
+
+**Process**:
+1. Guard clause: Validate monitoring scope and channels
+2. Collect sentiment data:
+   - Social media mentions and sentiment
+   - Review site ratings and comments
+   - Media coverage tone
+   - Customer feedback sentiment
+   - Community forum discussions
+3. Analyze sentiment trends:
+   - Overall sentiment score (positive/neutral/negative %)
+   - Sentiment by channel
+   - Trending topics (positive and negative)
+   - Sentiment drivers (what's causing shifts)
+   - Competitive comparison if requested
+4. Identify sentiment alerts:
+   - Sudden negative sentiment spikes
+   - Crisis early warning signals
+   - Emerging reputation issues
+5. Guard clause: Trigger crisis management if sentiment drop >20% in 24 hours
+6. Generate insights:
+   - What's working (positive drivers)
+   - What's concerning (negative drivers)
+   - Recommendations for improvement
+7. Track sentiment history in state for trending
+
+**Outputs**:
+```python
+{
+    "monitoring_period": dict[str, str],
+    "overall_sentiment": {
+        "score": float,                    # -100 to +100
+        "distribution": {
+            "positive": float,             # % positive mentions
+            "neutral": float,              # % neutral mentions
+            "negative": float,             # % negative mentions
+        },
+        "trend": str,                      # "improving" | "stable" | "declining"
+        "change_vs_previous": float,       # % change from previous period
+    },
+    "channel_sentiment": dict[str, dict[str, Any]],  # Per-channel breakdown
+    "trending_topics": {
+        "positive": list[dict[str, Any]],  # What people love
+        "negative": list[dict[str, Any]],  # What people complain about
+    },
+    "sentiment_drivers": {
+        "positive": list[str],             # Why sentiment is positive
+        "negative": list[str],             # Why sentiment is negative
+    },
+    "alerts": list[dict[str, Any]],        # Sentiment issues requiring attention
+    "competitive_comparison": dict[str, float],  # Brand vs competitors
+    "recommendations": list[str],          # Actions to improve sentiment
+    "crisis_triggered": bool,              # Whether crisis management activated
+    "monitored_at": str,
+}
+```
+
+**Error Handling**: If external sentiment APIs fail, fall back to manual review of key channels with reduced confidence.
+
+---
+
+##### 8. train_brand_voice
+
+**Purpose**: Train agents (especially content creators) on brand voice guidelines and messaging standards.
+
+**Inputs**:
+```python
+{
+    "training_type": str,                  # Required: "onboarding" | "refresh" | "guidelines_update"
+    "target_agents": list[str],            # Required: Agent IDs to train
+    "focus_areas": list[str],              # Optional: Specific topics to emphasize
+    "training_materials": dict[str, Any],  # Optional: Custom training content
+    "assessment_required": bool,           # Optional: Whether to test comprehension
+}
+```
+
+**Process**:
+1. Guard clause: Validate target agents exist and are content-producing agents
+2. Retrieve current brand guidelines
+3. Customize training for each agent type:
+   - Copywriter: Deep voice training, examples, templates
+   - Content Manager: Quality criteria, approval standards
+   - Social Media Manager: Channel-specific voice variations
+   - Campaign Manager: Messaging consistency across campaigns
+4. Create training materials:
+   - Brand personality overview
+   - Tone and voice guidelines
+   - Do/don't examples specific to agent role
+   - Common mistakes to avoid
+   - Templates and frameworks
+5. Conduct training:
+   - Provide guidelines and examples
+   - Share recent approved/rejected content with rationale
+   - Highlight common pitfalls for agent type
+6. If assessment_required:
+   - Provide brand voice scenarios
+   - Evaluate agent responses
+   - Identify gaps and provide feedback
+7. Track training completion and scores in state
+
+**Outputs**:
+```python
+{
+    "training_session_id": str,
+    "training_type": str,
+    "agents_trained": list[str],
+    "training_materials": {
+        "guidelines_version": str,         # Guidelines version used
+        "agent_specific_content": dict[str, Any],  # Customized per agent
+        "examples": list[dict[str, Any]],  # Good/bad examples
+        "templates": list[dict[str, Any]], # Approved templates
+    },
+    "assessment_results": dict[str, dict[str, Any]],  # If assessment conducted
+    "training_completion": {
+        "completed": list[str],            # Agents who completed training
+        "pending": list[str],              # Agents who need to complete
+        "scores": dict[str, float],        # Assessment scores (0-100)
+    },
+    "follow_up_needed": list[str],         # Agents needing additional training
+    "conducted_at": str,
+}
+```
+
+**Error Handling**: If agent training fails, log and schedule retry.
+
+---
+
+##### 9. audit_communications
+
+**Purpose**: Audit past communications for brand voice compliance and identify consistency issues.
+
+**Inputs**:
+```python
+{
+    "audit_scope": str,                    # Required: "campaign" | "channel" | "agent" | "timeframe"
+    "audit_target": str,                   # Required: ID of campaign/channel/agent to audit
+    "timeframe": dict[str, str],           # Required: start_date, end_date
+    "sample_size": int,                    # Optional: Number of items to review (default: all)
+    "focus_areas": list[str],              # Optional: Specific compliance areas
+}
+```
+
+**Process**:
+1. Guard clause: Validate audit scope and target
+2. Retrieve communications to audit:
+   - Query by campaign, channel, agent, or timeframe
+   - Sample if dataset too large (statistical sampling)
+3. Review each communication:
+   - Score against brand voice guidelines
+   - Identify violations
+   - Categorize compliance level
+4. Aggregate audit findings:
+   - Overall compliance rate
+   - Common violations
+   - Compliance by agent/channel
+   - Trends over time
+5. Identify root causes:
+   - Training gaps
+   - Guideline ambiguities
+   - Process issues
+   - Resource constraints
+6. Generate recommendations:
+   - Training needs
+   - Guideline clarifications
+   - Process improvements
+   - Quality checkpoints
+
+**Outputs**:
+```python
+{
+    "audit_id": str,
+    "audit_scope": str,
+    "items_audited": int,
+    "compliance_summary": {
+        "overall_compliance_rate": float,  # % fully compliant
+        "average_brand_score": float,      # 0-100
+        "compliance_distribution": {
+            "excellent": int,              # Score ≥90
+            "good": int,                   # Score 80-89
+            "acceptable": int,             # Score 70-79
+            "poor": int,                   # Score <70
+        },
+    },
+    "violations": {
+        "total_violations": int,
+        "violation_types": dict[str, int], # Count by violation type
+        "critical_violations": list[dict[str, Any]],  # High-priority issues
+    },
+    "compliance_by_dimension": dict[str, float],  # Tone, voice, messaging, etc.
+    "compliance_by_agent": dict[str, float],      # If auditing multiple agents
+    "compliance_by_channel": dict[str, float],    # If auditing multiple channels
+    "trends": {
+        "improving": list[str],            # What's getting better
+        "declining": list[str],            # What's getting worse
+    },
+    "root_causes": list[dict[str, Any]],   # Why compliance issues exist
+    "recommendations": {
+        "training": list[str],             # Training recommendations
+        "guidelines": list[str],           # Guideline improvements
+        "process": list[str],              # Process changes
+        "immediate_actions": list[str],    # Urgent fixes needed
+    },
+    "audited_at": str,
+}
+```
+
+**Error Handling**: If sample size too large, use statistical sampling with confidence intervals.
+
+---
+
+##### 10. report_brand_health
+
+**Purpose**: Generate comprehensive brand health and consistency reports for CMO and executive stakeholders.
+
+**Inputs**:
+```python
+{
+    "report_type": str,                    # Required: "executive_summary" | "detailed" | "crisis_impact" | "quarterly"
+    "timeframe": dict[str, str],           # Required: start_date, end_date
+    "include_sentiment": bool,             # Optional: Include sentiment analysis
+    "include_compliance": bool,            # Optional: Include compliance audit
+    "include_crisis": bool,                # Optional: Include crisis summary
+    "comparison_period": dict[str, str],   # Optional: Compare to previous period
+}
+```
+
+**Process**:
+1. Guard clause: Validate report type and timeframe
+2. Aggregate brand health metrics:
+   - Brand voice compliance rates
+   - Sentiment trends
+   - Crisis incidents and response
+   - Messaging consistency
+   - PR effectiveness
+3. Analyze trends:
+   - Period-over-period changes
+   - Improvement areas
+   - Concern areas
+4. Compile executive summary:
+   - Overall brand health score
+   - Key achievements
+   - Key concerns
+   - Strategic recommendations
+5. Include detailed sections if requested:
+   - Sentiment deep dive
+   - Compliance audit results
+   - Crisis management summary
+   - Channel-specific analysis
+6. Format for executive consumption:
+   - Executive summary (1 page)
+   - Key metrics dashboard
+   - Detailed findings
+   - Actionable recommendations
+
+**Outputs**:
+```python
+{
+    "report_id": str,
+    "report_type": str,
+    "reporting_period": dict[str, str],
+    "executive_summary": {
+        "brand_health_score": float,       # 0-100 overall
+        "score_change": float,             # vs previous period
+        "status": str,                     # "excellent" | "good" | "fair" | "concerning"
+        "key_achievements": list[str],     # Top 3 wins
+        "key_concerns": list[str],         # Top 3 issues
+        "strategic_recommendations": list[str],  # Top 3 actions
+    },
+    "brand_metrics": {
+        "compliance_rate": float,          # % brand-compliant communications
+        "sentiment_score": float,          # -100 to +100
+        "messaging_consistency": float,    # 0-100
+        "crisis_count": int,               # Number of crises handled
+        "response_time_avg": float,        # Average hours to respond
+    },
+    "trends": {
+        "compliance_trend": str,           # "improving" | "stable" | "declining"
+        "sentiment_trend": str,
+        "consistency_trend": str,
+    },
+    "sentiment_analysis": dict[str, Any],  # If include_sentiment=true
+    "compliance_audit": dict[str, Any],    # If include_compliance=true
+    "crisis_summary": dict[str, Any],      # If include_crisis=true
+    "recommendations": {
+        "immediate": list[str],            # Urgent actions
+        "short_term": list[str],           # Next 30 days
+        "strategic": list[str],            # Long-term improvements
+    },
+    "generated_at": str,
+}
+```
+
+**Error Handling**: If data incomplete, clearly mark estimates and confidence levels.
+
+---
+
+#### 4.13.4 State Management
+
+The Director of Communications maintains comprehensive state for brand governance:
+
+```python
+class DirectorOfCommunicationsAgent(BaseAgent):
+    def __init__(self, config: AgentConfig):
+        super().__init__(config)
+
+        # Brand guidelines and standards
+        self._brand_guidelines: dict[str, Any] = {
+            "version": "1.0.0",
+            "personality": ["professional", "innovative", "trustworthy", "helpful"],
+            "tone": {
+                "professional_casual_scale": 7,  # 1-10 (1=very casual, 10=very formal)
+                "serious_playful_scale": 6,
+                "reserved_enthusiastic_scale": 7,
+                "respect_irreverent_scale": 8,
+            },
+            "voice_characteristics": {
+                "clarity": "Use simple, clear language",
+                "empathy": "Show understanding of customer challenges",
+                "expertise": "Demonstrate knowledge without jargon",
+                "authenticity": "Be genuine, avoid marketing speak",
+            },
+            "prohibited_terms": ["revolutionary", "game-changing", "synergy"],
+            "preferred_terminology": {
+                "customers": "clients",
+                "users": "customers",
+                "cheap": "cost-effective",
+            },
+            "messaging_pillars": [
+                "Innovation through AI",
+                "Customer-first approach",
+                "Measurable results",
+            ],
+        }
+
+        # Approved messaging frameworks
+        self._approved_messaging: list[dict[str, Any]] = []
+
+        # Crisis management state
+        self._crisis_protocols: dict[str, Any] = {
+            "severity_levels": {
+                "low": {"response_time": "24h", "approval": "director"},
+                "medium": {"response_time": "4h", "approval": "director"},
+                "high": {"response_time": "1h", "approval": "cmo"},
+                "critical": {"response_time": "15min", "approval": "cmo"},
+            },
+            "active_crises": [],
+            "crisis_history": [],
+        }
+
+        # Sentiment tracking
+        self._sentiment_tracking: dict[str, float] = {
+            "linkedin": 0.75,
+            "twitter": 0.68,
+            "email": 0.82,
+            "blog": 0.79,
+            "overall": 0.76,
+        }
+
+        # Compliance tracking
+        self._compliance_reports: list[dict[str, Any]] = []
+
+        # Training records
+        self._training_history: dict[str, list[dict[str, Any]]] = {}
+
+        # Agent references
+        self._cmo_agent: Optional[Any] = None
+        self._vp_marketing_agent: Optional[Any] = None
+        self._content_manager: Optional[Any] = None
+        self._copywriter: Optional[Any] = None
+
+        # Strategy Pattern dispatch
+        self._task_handlers: dict[str, Callable[[Task], Coroutine[Any, Any, dict[str, Any]]]] = {
+            "review_brand_voice": self._review_brand_voice,
+            "approve_messaging": self._approve_messaging,
+            "manage_crisis": self._manage_crisis,
+            "define_brand_guidelines": self._define_brand_guidelines,
+            "review_pr_materials": self._review_pr_materials,
+            "coordinate_messaging": self._coordinate_messaging,
+            "monitor_brand_sentiment": self._monitor_brand_sentiment,
+            "train_brand_voice": self._train_brand_voice,
+            "audit_communications": self._audit_communications,
+            "report_brand_health": self._report_brand_health,
+        }
+```
+
+**WHY this state structure**: Supports all 10 task types, tracks brand health over time, enables compliance auditing, facilitates crisis response.
+
+**HOW state is used**: Guidelines inform all reviews, sentiment tracks brand health, crisis protocols enable rapid response, training history identifies gaps.
+
+---
+
+#### 4.13.5 Integration Points
+
+**Reports To:**
+- **CMO Agent**: Strategic brand direction, crisis escalation, major guideline changes, quarterly brand health reports
+
+**Collaborates With:**
+- **VP Marketing**: Campaign messaging approval, operational messaging coordination
+- **Content Manager**: Editorial oversight, content calendar brand alignment
+- **Copywriter**: Brand voice training, template approval, quality feedback
+- **Social Media Manager**: Channel-specific voice guidance, crisis response
+- **Campaign Manager**: Campaign messaging approval, cross-campaign consistency
+- **Market Research**: Sentiment data, competitive messaging analysis
+
+**Supervises (Brand Compliance):**
+- All content-producing agents for brand voice adherence
+- Crisis communication execution across all channels
+
+---
+
+#### 4.13.6 Decision Framework
+
+**Brand Voice Approval Criteria:**
+1. **Tone Alignment**: Content tone matches brand tone guidelines (≥85% match)
+2. **Voice Consistency**: Voice characteristics reflected (≥85% match)
+3. **No Violations**: No prohibited language or critical guideline violations
+4. **Messaging Fit**: Aligns with approved messaging pillars
+5. **Audience Appropriate**: Suitable for target audience
+
+**Approval Thresholds:**
+- **Auto-Approve**: All criteria ≥90%, no violations
+- **Conditional Approve**: All criteria ≥80%, minor violations only
+- **Revision Needed**: Any criteria <70%, or moderate violations
+- **Reject**: Critical violations or major brand risk
+
+**Crisis Escalation Triggers (when to escalate to CMO):**
+1. **Critical Severity**: Any crisis rated "critical"
+2. **High Impact**: Crisis affecting >10% of customer base or major revenue impact
+3. **Executive Involvement**: Crisis requiring CEO/executive statement
+4. **Legal Implications**: Potential legal or regulatory consequences
+5. **Brand Reputation**: Major threat to brand reputation or trust
+6. **Media Attention**: National media coverage or viral social media
+7. **Competitor Attack**: Coordinated competitive campaign against brand
+8. **Uncertainty**: When appropriate response strategy is unclear
+
+**Messaging Approval Authority:**
+- **Director Approves**: Routine campaign messaging, tactical communications
+- **CMO Approves**: Strategic positioning changes, major announcements, crisis messaging
+- **Escalate to CMO**: Budget >$50K, brand repositioning, competitive response, controversial topics
+
+---
+
+#### 4.13.7 Performance Metrics
+
+**Brand Consistency Metrics:**
+- **Overall Compliance Rate**: Target >95% of communications brand-compliant
+- **Brand Voice Score**: Target average score >85/100 across all content
+- **Violation Rate**: Target <5% content with guideline violations
+- **Consistency Score**: Target >90% messaging consistency across channels
+
+**Operational Efficiency:**
+- **Review Turnaround Time**: Target <4 hours for routine reviews
+- **Crisis Response Time**: Target <30 minutes to activate crisis protocol
+- **Approval Rate**: Target 80% approval rate on first review (indicates clear guidelines)
+- **Training Effectiveness**: Target >85% score on brand voice assessments
+
+**Brand Health:**
+- **Sentiment Score**: Target >0.70 overall brand sentiment (-1 to +1 scale)
+- **Sentiment Trend**: Target positive or stable trend over 90 days
+- **Crisis Count**: Target <1 crisis per quarter
+- **Recovery Time**: Target <7 days to return to pre-crisis sentiment
+
+**Stakeholder Satisfaction:**
+- **CMO Confidence**: Quarterly rating of brand consistency (target >4/5)
+- **Content Creator Satisfaction**: Agent feedback on guideline clarity (target >4/5)
+- **Escalation Rate**: Target <10% of reviews escalated to CMO
+
+---
+
+#### 4.13.8 Architecture Compliance
+
+**Strategy Pattern Implementation:**
+
+```python
+# ❌ WRONG - if/elif chains
+async def execute(self, task: Task) -> TaskResult:
+    if task.task_type == "review_brand_voice":
+        result = await self._review_brand_voice(task)
+    elif task.task_type == "approve_messaging":
+        result = await self._approve_messaging(task)
+    # ... more elif chains
+
+# ✅ CORRECT - Strategy Pattern dictionary dispatch
+async def execute(self, task: Task) -> TaskResult:
+    handler = self._task_handlers.get(task.task_type)
+
+    # Guard clause: Unknown task type
+    if not handler:
+        raise AgentExecutionError(
+            message=f"Unknown task type: {task.task_type}",
+            context={"agent_id": self.agent_id, "task_id": task.task_id},
+        )
+
+    result = await handler(task)
+    return TaskResult(status=TaskStatus.COMPLETED, result=result)
+```
+
+**Guard Clause Pattern:**
+
+```python
+# ✅ CORRECT - Guard clauses only, no nested ifs
+async def _review_brand_voice(self, task: Task) -> dict[str, Any]:
+    """Review content for brand voice consistency."""
+
+    # Guard clause: Validate required parameters
+    if "content_text" not in task.parameters:
+        return {"error": "content_text is required"}
+
+    content = task.parameters["content_text"]
+
+    # Guard clause: Empty content
+    if not content or len(content.strip()) == 0:
+        return {"error": "Content cannot be empty"}
+
+    # Perform brand voice analysis
+    scores = self._analyze_brand_voice(content)
+    overall_score = sum(scores.values()) / len(scores)
+
+    # Guard clause: Auto-approve excellent content
+    if overall_score >= 90 and self._no_critical_violations(content):
+        return {
+            "review_status": "approved",
+            "brand_voice_score": overall_score,
+            "feedback": "Excellent brand voice alignment",
+        }
+
+    # Guard clause: Request revision for poor content
+    if overall_score < 70:
+        return {
+            "review_status": "revision_needed",
+            "brand_voice_score": overall_score,
+            "feedback": "Significant brand voice improvements needed",
+        }
+
+    # Default: Conditional approval
+    return {
+        "review_status": "approved_with_notes",
+        "brand_voice_score": overall_score,
+        "feedback": "Good with minor improvements suggested",
+    }
+```
+
+**Exception Wrapping:**
+
+```python
+async def _manage_crisis(self, task: Task) -> dict[str, Any]:
+    """Handle crisis communications."""
+    try:
+        crisis_type = task.parameters["crisis_type"]
+        severity = task.parameters["severity"]
+
+        # Crisis management logic...
+        response = self._generate_crisis_response(crisis_type, severity)
+
+        return {
+            "crisis_id": task.task_id,
+            "response_status": "activated",
+            "holding_statement": response,
+        }
+
+    except KeyError as e:
+        raise AgentExecutionError(
+            message=f"Missing required crisis parameter: {str(e)}",
+            original_exception=e,
+            context={"agent_id": self.agent_id, "task_id": task.task_id},
+        )
+    except Exception as e:
+        raise AgentExecutionError(
+            message=f"Failed to manage crisis: {str(e)}",
+            original_exception=e,
+            context={"agent_id": self.agent_id, "task_id": task.task_id},
+        )
+```
+
+**Type Hints:**
+
+```python
+async def _coordinate_messaging(
+    self,
+    task: Task,
+) -> dict[str, Any]:
+    """
+    Coordinate messaging across campaigns and channels.
+
+    WHY: Ensures brand consistency when multiple campaigns run simultaneously.
+
+    HOW: Analyzes all campaign messaging, identifies conflicts, creates unified
+         framework with message hierarchy and channel guidance.
+
+    Args:
+        task: Task containing coordination_scope, campaigns, timeframe, channels
+
+    Returns:
+        dict containing coordination_id, unified_messaging_framework,
+        coordination_plan, conflicts_resolved
+
+    Raises:
+        AgentExecutionError: If coordination fails or conflicts unresolvable
+    """
+    # Implementation with full type safety
+    campaigns: list[str] = task.parameters["campaigns"]
+    timeframe: dict[str, str] = task.parameters["timeframe"]
+    # ...
+```
+
+---
+
+#### 4.13.9 Testing Strategy
+
+**Unit Tests (16 tests minimum):**
+1. Test each of 10 task types independently
+2. Test brand voice scoring algorithm
+3. Test crisis severity assessment
+4. Test messaging approval criteria
+5. Test guideline validation
+6. Test sentiment alert triggers
+7. Test unknown task type handling
+8. Test parameter validation
+9. Test agent lifecycle (start/stop)
+
+**Integration Tests (12 tests minimum):**
+1. Full brand voice review workflow with Copywriter
+2. Campaign messaging approval with VP Marketing
+3. Crisis management workflow with CMO escalation
+4. Brand guidelines update and agent training
+5. PR materials review and approval
+6. Multi-campaign messaging coordination
+7. Sentiment monitoring with alert triggering
+8. Brand voice training with assessment
+9. Communications audit across multiple agents
+10. Brand health report generation
+11. Crisis-to-resolution workflow
+12. Graceful degradation when LLM unavailable
+
+**Scenario Tests:**
+1. Crisis communication under time pressure
+2. Conflicting campaign messaging resolution
+3. Major brand guideline revision rollout
+4. Sentiment crash requiring rapid response
+5. High-profile PR announcement approval
+
+---
+
+#### 4.13.10 Future Enhancements
+
+**Phase 1 (Short-term):**
+- AI-powered brand voice analysis using fine-tuned LLM
+- Real-time sentiment monitoring with instant alerts
+- Automated compliance scoring for all content
+- Integration with brand monitoring tools (Brandwatch, Mention)
+
+**Phase 2 (Medium-term):**
+- Predictive crisis detection using sentiment patterns
+- Automated brand voice training curriculum generation
+- Multi-language brand voice guidelines and enforcement
+- Competitive messaging analysis and differentiation recommendations
+
+**Phase 3 (Long-term):**
+- AI-generated crisis response with human oversight
+- Proactive brand risk identification before content published
+- Dynamic brand guidelines that adapt to audience preferences
+- Integration with legal and compliance systems for automated review
+
+**Advanced Features:**
+- Natural language brand queries ("How would we describe our AI capabilities?")
+- Automated brand voice templates for common content types
+- Brand sentiment forecasting based on planned campaigns
+- Integration with influencer and employee advocacy programs
+
+---
+
 ## 5. Data Models
 
 ### 5.1 Core Entities
