@@ -471,6 +471,195 @@ Publication/Iteration
 
 ## 4. Component Specifications
 
+### 4.0 CMO Agent (Chief Marketing Officer - Executive Layer)
+
+**Purpose**: Top-level executive supervisory agent providing strategic oversight, resource allocation, and coordination across all marketing activities.
+
+**Role in Hierarchy**: Executive Layer - supervises all management-layer agents (Campaign Manager, Social Media Manager, Content Manager).
+
+**Responsibilities**:
+- Define and maintain overall marketing strategy aligned with business objectives
+- Approve/reject campaign proposals based on strategic alignment and resource availability
+- Allocate marketing budget across campaigns and channels
+- Monitor consolidated performance metrics across all marketing activities
+- Coordinate multi-campaign marketing initiatives and cross-functional projects
+- Generate executive-level reports and insights for stakeholders
+- Set priorities and resolve conflicts between competing marketing initiatives
+- Maintain strategic state (goals, budgets, priorities, approved strategies)
+
+**Supported Task Types**:
+
+1. **create_marketing_strategy**: Define overall marketing objectives, target audiences, and strategic initiatives
+2. **approve_campaign**: Review campaign proposals and approve/reject based on strategic criteria
+3. **allocate_budget**: Distribute marketing budget across campaigns, channels, and time periods
+4. **monitor_performance**: Aggregate and analyze performance data from all management agents
+5. **coordinate_initiative**: Orchestrate multi-campaign initiatives requiring cross-functional coordination
+6. **generate_executive_report**: Create high-level marketing performance summaries for stakeholders
+7. **set_priorities**: Establish priority levels for campaigns and resolve resource conflicts
+8. **review_manager_performance**: Evaluate management agent effectiveness and adjust delegation strategies
+
+**Key Methods**:
+
+```python
+class CMOAgent(BaseAgent):
+    """
+    Executive-layer agent for strategic marketing oversight.
+
+    WHY: Provides unified strategic direction and resource coordination.
+    HOW: Supervises management agents, maintains strategy state, delegates execution.
+    """
+
+    async def _create_marketing_strategy(
+        self,
+        task: Task
+    ) -> dict[str, Any]:
+        """
+        WHY: Establish strategic foundation for all marketing activities.
+        HOW: Analyzes objectives, creates strategy, stores in state.
+        """
+
+    async def _approve_campaign(
+        self,
+        task: Task
+    ) -> dict[str, Any]:
+        """
+        WHY: Ensure campaigns align with strategy and resources.
+        HOW: Fetches campaign details from Campaign Manager, evaluates, approves/rejects.
+        """
+
+    async def _allocate_budget(
+        self,
+        task: Task
+    ) -> dict[str, Any]:
+        """
+        WHY: Optimize resource allocation across marketing activities.
+        HOW: Analyzes priorities, ROI, distributes budget, tracks allocations.
+        """
+
+    async def _monitor_performance(
+        self,
+        task: Task
+    ) -> dict[str, Any]:
+        """
+        WHY: Track overall marketing effectiveness and identify issues.
+        HOW: Aggregates metrics from all management agents, generates insights.
+        """
+
+    async def _coordinate_initiative(
+        self,
+        task: Task
+    ) -> dict[str, Any]:
+        """
+        WHY: Synchronize multi-campaign efforts for maximum impact.
+        HOW: Delegates coordinated tasks to multiple managers, tracks progress.
+        """
+
+    async def _generate_executive_report(
+        self,
+        task: Task
+    ) -> dict[str, Any]:
+        """
+        WHY: Provide stakeholders with strategic marketing insights.
+        HOW: Collects data from all layers, analyzes trends, formats report.
+        """
+
+    async def _set_priorities(
+        self,
+        task: Task
+    ) -> dict[str, Any]:
+        """
+        WHY: Guide resource allocation and resolve conflicts.
+        HOW: Evaluates strategic importance, sets priority levels, notifies managers.
+        """
+```
+
+**State Management**:
+- **Marketing Strategy**: Current strategy document (objectives, target audiences, key initiatives)
+- **Budget Allocations**: Total budget, per-campaign allocations, remaining budget
+- **Campaign Approvals**: Approved campaigns, pending approvals, rejected campaigns with reasons
+- **Priority Matrix**: Campaign priorities, resource allocation priorities
+- **Performance Baselines**: KPIs, targets, historical performance data
+- **Manager Registry**: References to all management-layer agents for delegation
+
+**Delegation Pattern**:
+
+```python
+# CMO maintains registry of management agents
+self._managers: dict[AgentRole, BaseAgent] = {
+    AgentRole.CAMPAIGN_MANAGER: campaign_manager_instance,
+    AgentRole.SOCIAL_MEDIA_MANAGER: social_media_manager_instance,
+    AgentRole.CONTENT_MANAGER: content_manager_instance,
+}
+
+# Delegates through management layer (never directly to specialists)
+async def _approve_campaign(self, task: Task):
+    # Get campaign details FROM Campaign Manager
+    campaign_manager = self._managers[AgentRole.CAMPAIGN_MANAGER]
+    status_task = self._create_manager_task(...)
+    campaign_data = await campaign_manager.execute(status_task)
+
+    # Make approval decision
+    approval = self._evaluate_campaign(campaign_data)
+
+    # Delegate launch THROUGH Campaign Manager
+    if approval["approved"]:
+        launch_task = self._create_manager_task(...)
+        result = await campaign_manager.execute(launch_task)
+```
+
+**Architecture Compliance**:
+- ✅ **Strategy Pattern**: Dictionary dispatch for all task types (zero if/elif chains)
+- ✅ **Guard Clauses**: Early returns for validation, no nested ifs
+- ✅ **Full Type Hints**: All methods fully typed with return types
+- ✅ **WHY/HOW Documentation**: Every method documents reasoning and implementation
+- ✅ **Exception Wrapping**: All external calls wrapped with AgentExecutionError
+- ✅ **Graceful Degradation**: Continues operating if individual managers fail
+- ✅ **TDD Methodology**: Tests written first (RED-GREEN-REFACTOR)
+
+**Error Handling**:
+- Wrap all manager execution calls in try-except blocks
+- Continue with partial results if some managers fail
+- Track failed delegations for later retry or escalation
+- Never propagate manager failures to human unless critical
+
+**Strategic Decision Making**:
+
+```python
+def _evaluate_campaign(self, campaign_data: dict[str, Any]) -> dict[str, Any]:
+    """
+    WHY: Ensure campaigns meet strategic criteria before approval.
+    HOW: Evaluates against strategy, budget, priorities, returns decision.
+
+    Strategic Criteria:
+    - Alignment with current marketing strategy
+    - Budget availability and ROI projections
+    - Priority relative to other campaigns
+    - Resource availability and timing
+    - Risk assessment and brand safety
+    """
+```
+
+**Integration with Management Layer**:
+
+```
+CMO Agent
+    │
+    ├─> Campaign Manager (campaign lifecycle, multi-channel coordination)
+    ├─> Social Media Manager (social media strategy, platform coordination)
+    ├─> Content Manager (content strategy, editorial oversight)
+    ├─> Email Specialist (email campaign strategy)
+    └─> Analytics Specialist (consolidated reporting, insights)
+```
+
+**Future Enhancements**:
+- Machine learning for budget optimization
+- Predictive analytics for campaign performance
+- A/B testing strategies across campaigns
+- Automated strategy adjustment based on performance
+- Integration with VP Marketing and Director of Communications agents
+
+---
+
 ### 4.1 Orchestrator Agent
 
 **Purpose**: Central coordinator for all marketing automation tasks
