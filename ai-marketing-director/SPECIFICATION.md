@@ -3185,6 +3185,846 @@ keyword_data = await self._semrush_client.keyword_research(topic)
 
 ---
 
+### 4.9 Designer Specialist Agent (Specialist Layer)
+
+**Role**: Designer Specialist
+**Layer**: Specialist Layer
+**Reports To**: Content Manager, Social Media Manager, Campaign Manager
+**Coordinates With**: Copywriter Specialist, SEO Specialist
+
+#### 4.9.1 Purpose
+
+**WHY**: Provides specialized visual design expertise to create compelling graphics and ensure brand consistency across all marketing channels.
+
+**HOW**: Generates visual assets using AI image generation tools, creates platform-specific graphics, designs marketing materials, and ensures brand compliance using configurable brand guidelines.
+
+The Designer Specialist bridges the gap between content creation and visual presentation, ensuring all content has professional, on-brand visual elements.
+
+#### 4.9.2 Capabilities
+
+The Designer Specialist Agent provides these specialized capabilities:
+
+1. **Social Media Graphics**
+   - Generate platform-specific graphics (LinkedIn, Twitter, Instagram, Facebook)
+   - Create post images with optimal dimensions
+   - Design profile banners and headers
+   - Generate story and carousel graphics
+   - Add text overlays and branding
+
+2. **Blog and Content Images**
+   - Create featured images for blog posts
+   - Generate inline images and illustrations
+   - Design hero images and headers
+   - Create thumbnail images
+   - Generate data visualizations
+
+3. **Marketing Materials**
+   - Design advertising banners and creatives
+   - Create email marketing headers
+   - Generate promotional graphics
+   - Design landing page visuals
+   - Create campaign-specific assets
+
+4. **Infographics and Data Viz**
+   - Design data-driven infographics
+   - Create charts and graphs
+   - Generate comparison visuals
+   - Design process diagrams
+   - Create timeline graphics
+
+5. **Brand Consistency**
+   - Enforce brand color palette
+   - Apply brand fonts and typography
+   - Ensure logo usage compliance
+   - Maintain visual style consistency
+   - Validate brand guideline adherence
+
+6. **Design Variations**
+   - Generate A/B test variations
+   - Create color scheme alternatives
+   - Design layout variations
+   - Generate style variations
+   - Test different compositions
+
+7. **Image Optimization**
+   - Compress images for web
+   - Convert to optimal formats (WebP, PNG, JPG)
+   - Resize for platform requirements
+   - Optimize file sizes
+   - Generate responsive versions
+
+8. **Design Recommendations**
+   - Suggest design improvements
+   - Recommend color palettes
+   - Provide composition feedback
+   - Identify accessibility issues
+   - Track design performance
+
+#### 4.9.3 Task Types
+
+The Designer Specialist handles these task types using **Strategy Pattern** (dictionary dispatch):
+
+```python
+class DesignerSpecialistAgent(BaseAgent):
+    """
+    Specialist-layer agent for visual design and asset creation.
+
+    WHY: Provides specialized design expertise for creating professional visuals.
+    HOW: Uses AI image generation tools with brand guidelines to create
+         platform-optimized graphics and marketing materials.
+    """
+
+    def __init__(self, config: AgentConfig, brand_guidelines: Optional[BrandGuidelines] = None):
+        super().__init__(config)
+
+        # AI image generation clients
+        self._dalle_client: Optional[DALLEClient] = None
+        self._midjourney_client: Optional[MidjourneyClient] = None
+        self._stable_diffusion_client: Optional[StableDiffusionClient] = None
+
+        # Brand guidelines
+        self._brand_guidelines: Optional[BrandGuidelines] = brand_guidelines
+
+        # Design template library
+        self._templates: dict[str, DesignTemplate] = {}
+
+        # Generated assets cache
+        self._asset_cache: dict[str, GeneratedAsset] = {}
+
+        # Platform specifications
+        self._platform_specs: dict[str, dict[str, dict[str, int]]] = self._load_platform_specs()
+
+        # Strategy Pattern: Dictionary dispatch for task routing
+        self._task_handlers: dict[
+            str, Callable[[Task], Coroutine[Any, Any, dict[str, Any]]]
+        ] = {
+            "generate_social_graphic": self._generate_social_graphic,
+            "generate_blog_image": self._generate_blog_image,
+            "create_infographic": self._create_infographic,
+            "generate_ad_creative": self._generate_ad_creative,
+            "design_email_header": self._design_email_header,
+            "create_thumbnail": self._create_thumbnail,
+            "generate_design_variations": self._generate_design_variations,
+            "optimize_image": self._optimize_image,
+        }
+
+    async def _execute_task(self, task: Task) -> dict[str, Any]:
+        """
+        Execute task using Strategy Pattern.
+
+        WHY: Eliminates if/elif chains for better maintainability.
+        HOW: Uses dictionary dispatch to route to appropriate handler.
+        """
+        # Guard clause: Check if task type is supported
+        if task.task_type not in self._task_handlers:
+            raise AgentExecutionError(
+                agent_id=self.agent_id,
+                task_id=task.task_id,
+                message=f"Unsupported task type: {task.task_type}"
+            )
+
+        handler = self._task_handlers[task.task_type]
+
+        # Execute handler with exception wrapping
+        try:
+            return await handler(task)
+        except Exception as e:
+            raise AgentExecutionError(
+                agent_id=self.agent_id,
+                task_id=task.task_id,
+                message=f"Task execution failed: {str(e)}",
+                original_exception=e
+            )
+```
+
+##### Task Type 1: generate_social_graphic
+
+Generate platform-specific social media graphics.
+
+**Parameters:**
+- `platform` (required): Platform name (linkedin, twitter, instagram, facebook)
+- `content_topic` (required): Topic or subject of the graphic
+- `graphic_type` (optional): Type of graphic (post, story, banner, profile) (default: "post")
+- `style` (optional): Visual style (professional, casual, bold, minimal) (default: "professional")
+- `include_text` (optional): Include text overlay (default: False)
+- `text_content` (optional): Text to overlay on image
+
+**Returns:**
+```python
+{
+    "image_url": "https://cdn.example.com/graphics/linkedin_post_001.webp",
+    "image_path": "/var/assets/graphics/linkedin_post_001.webp",
+    "platform": "linkedin",
+    "graphic_type": "post",
+    "dimensions": {
+        "width": 1200,
+        "height": 627
+    },
+    "file_size_kb": 145,
+    "format": "webp",
+    "brand_compliance_score": 92.5,
+    "optimization_applied": True,
+    "generation_time_ms": 3500
+}
+```
+
+**Example:**
+```python
+social_graphic_task = Task(
+    task_type="generate_social_graphic",
+    parameters={
+        "platform": "linkedin",
+        "content_topic": "AI Marketing Automation",
+        "graphic_type": "post",
+        "style": "professional",
+        "include_text": True,
+        "text_content": "Transform Your Marketing with AI"
+    },
+    assigned_to=AgentRole.DESIGNER,
+    assigned_by=AgentRole.SOCIAL_MEDIA_MANAGER
+)
+```
+
+##### Task Type 2: generate_blog_image
+
+Generate featured images for blog posts.
+
+**Parameters:**
+- `blog_title` (required): Title of the blog post
+- `blog_summary` (required): Brief summary of content
+- `keywords` (optional): SEO keywords to incorporate visually
+- `style` (optional): Visual style (default: "professional")
+- `image_type` (optional): Type (featured, hero, inline) (default: "featured")
+
+**Returns:**
+```python
+{
+    "image_url": "https://cdn.example.com/blog/featured_ai_marketing_001.webp",
+    "image_path": "/var/assets/blog/featured_ai_marketing_001.webp",
+    "image_type": "featured",
+    "dimensions": {
+        "width": 1200,
+        "height": 630
+    },
+    "file_size_kb": 180,
+    "format": "webp",
+    "brand_compliance_score": 95.0,
+    "seo_optimized": True,
+    "alt_text": "Illustration showing AI-powered marketing automation dashboard",
+    "suggestions": [
+        "Consider adding brand logo for recognition",
+        "Image aligns well with content topic"
+    ]
+}
+```
+
+##### Task Type 3: create_infographic
+
+Design data-driven infographics.
+
+**Parameters:**
+- `title` (required): Infographic title
+- `data` (required): Data to visualize (dict or list)
+- `chart_type` (required): Type of visualization (bar, pie, line, comparison, timeline)
+- `color_scheme` (optional): Color scheme (brand, monochrome, vibrant) (default: "brand")
+- `layout` (optional): Layout style (vertical, horizontal, grid) (default: "vertical")
+
+**Returns:**
+```python
+{
+    "infographic_url": "https://cdn.example.com/infographics/marketing_roi_001.png",
+    "infographic_path": "/var/assets/infographics/marketing_roi_001.png",
+    "title": "Marketing Automation ROI",
+    "chart_type": "bar",
+    "dimensions": {
+        "width": 800,
+        "height": 1200
+    },
+    "file_size_kb": 320,
+    "format": "png",
+    "data_visualized": {
+        "ROI Increase": "150%",
+        "Time Saved": "40%",
+        "Efficiency Gain": "200%"
+    },
+    "brand_compliance_score": 90.0,
+    "accessibility": {
+        "color_contrast": "AAA",
+        "readable_fonts": True
+    }
+}
+```
+
+##### Task Type 4: generate_ad_creative
+
+Create advertising graphics and banners.
+
+**Parameters:**
+- `ad_type` (required): Type of ad (banner, display, social, native)
+- `size` (required): Ad size (leaderboard, rectangle, skyscraper, custom)
+- `message` (required): Primary message/headline
+- `call_to_action` (required): CTA text
+- `product_image` (optional): URL to product image
+- `brand_elements` (optional): Include logo, colors, etc. (default: True)
+
+**Returns:**
+```python
+{
+    "ad_creative_url": "https://cdn.example.com/ads/leaderboard_001.webp",
+    "ad_creative_path": "/var/assets/ads/leaderboard_001.webp",
+    "ad_type": "banner",
+    "size": "leaderboard",
+    "dimensions": {
+        "width": 728,
+        "height": 90
+    },
+    "message": "Transform Your Marketing",
+    "cta": "Start Free Trial",
+    "file_size_kb": 85,
+    "format": "webp",
+    "brand_compliance_score": 93.0,
+    "estimated_ctr": "high",
+    "variations_available": 3
+}
+```
+
+##### Task Type 5: design_email_header
+
+Generate email marketing headers.
+
+**Parameters:**
+- `email_type` (required): Type of email (newsletter, promotional, transactional)
+- `subject` (required): Email subject line
+- `theme` (optional): Visual theme (default: "brand")
+- `include_logo` (optional): Include brand logo (default: True)
+
+**Returns:**
+```python
+{
+    "header_url": "https://cdn.example.com/email/header_newsletter_001.png",
+    "header_path": "/var/assets/email/header_newsletter_001.png",
+    "email_type": "newsletter",
+    "dimensions": {
+        "width": 600,
+        "height": 200
+    },
+    "file_size_kb": 95,
+    "format": "png",
+    "brand_compliance_score": 94.0,
+    "mobile_optimized": True,
+    "email_client_compatible": ["gmail", "outlook", "apple_mail"]
+}
+```
+
+##### Task Type 6: create_thumbnail
+
+Generate video or content thumbnails.
+
+**Parameters:**
+- `content_type` (required): Type of content (video, podcast, webinar)
+- `title` (required): Content title
+- `duration` (optional): Content duration (for display)
+- `style` (optional): Thumbnail style (default: "engaging")
+- `include_play_button` (optional): Add play button overlay (default: True)
+
+**Returns:**
+```python
+{
+    "thumbnail_url": "https://cdn.example.com/thumbnails/webinar_001.jpg",
+    "thumbnail_path": "/var/assets/thumbnails/webinar_001.jpg",
+    "content_type": "webinar",
+    "dimensions": {
+        "width": 1280,
+        "height": 720
+    },
+    "file_size_kb": 125,
+    "format": "jpg",
+    "includes_play_button": True,
+    "brand_compliance_score": 91.0,
+    "estimated_click_rate": "high"
+}
+```
+
+##### Task Type 7: generate_design_variations
+
+Create multiple design variations for A/B testing.
+
+**Parameters:**
+- `base_design_id` (required): ID of base design to create variations from
+- `variation_count` (optional): Number of variations (default: 3)
+- `variation_types` (optional): Types of variations (color, layout, style) (default: ["color", "layout", "style"])
+
+**Returns:**
+```python
+{
+    "base_design_id": "design_001",
+    "variations": [
+        {
+            "variation_id": "var_001",
+            "type": "color",
+            "image_url": "https://cdn.example.com/variations/var_001.webp",
+            "description": "Blue color scheme variation",
+            "brand_compliance_score": 90.0
+        },
+        {
+            "variation_id": "var_002",
+            "type": "layout",
+            "image_url": "https://cdn.example.com/variations/var_002.webp",
+            "description": "Center-aligned layout variation",
+            "brand_compliance_score": 88.0
+        },
+        {
+            "variation_id": "var_003",
+            "type": "style",
+            "image_url": "https://cdn.example.com/variations/var_003.webp",
+            "description": "Minimal style variation",
+            "brand_compliance_score": 92.0
+        }
+    ],
+    "total_variations": 3,
+    "ready_for_ab_test": True,
+    "recommended_variation": "var_003"
+}
+```
+
+##### Task Type 8: optimize_image
+
+Optimize images for web performance.
+
+**Parameters:**
+- `image_url` (required): URL or path to source image
+- `target_format` (optional): Target format (webp, png, jpg) (default: "webp")
+- `quality` (optional): Quality percentage (1-100) (default: 85)
+- `max_width` (optional): Maximum width in pixels
+- `max_height` (optional): Maximum height in pixels
+
+**Returns:**
+```python
+{
+    "optimized_url": "https://cdn.example.com/optimized/image_001.webp",
+    "optimized_path": "/var/assets/optimized/image_001.webp",
+    "original_size_kb": 850,
+    "optimized_size_kb": 145,
+    "compression_ratio": "83%",
+    "format": "webp",
+    "dimensions": {
+        "width": 1200,
+        "height": 630
+    },
+    "quality_score": 85,
+    "optimization_applied": [
+        "format_conversion",
+        "compression",
+        "resize"
+    ]
+}
+```
+
+#### 4.9.4 State Management
+
+The Designer Specialist maintains these state components:
+
+```python
+class DesignerSpecialistAgent(BaseAgent):
+    def __init__(self, config: AgentConfig, brand_guidelines: Optional[BrandGuidelines] = None):
+        super().__init__(config)
+
+        # Generated assets database
+        self._generated_assets: dict[str, GeneratedAsset] = {}
+        # Format: {
+        #     "asset_id": GeneratedAsset(
+        #         id="asset_001",
+        #         type="social_graphic",
+        #         url="...",
+        #         created_at=datetime,
+        #         brand_score=92.5
+        #     )
+        # }
+
+        # Design variations tracking
+        self._design_variations: dict[str, list[str]] = {}
+        # Format: {
+        #     "base_design_id": ["var_001", "var_002", "var_003"]
+        # }
+
+        # Brand compliance scores
+        self._brand_scores: dict[str, float] = {}
+
+        # Template library
+        self._templates: dict[str, DesignTemplate] = {}
+
+        # Platform specifications (loaded from config)
+        self._platform_specs: dict[str, dict[str, dict[str, int]]] = {}
+```
+
+#### 4.9.5 External Integrations
+
+The Designer Specialist integrates with these external services:
+
+**DALL-E API (OpenAI):**
+- AI image generation
+- Style transfer
+- Image editing
+- Variation generation
+
+**Midjourney API (Optional):**
+- High-quality image generation
+- Artistic styles
+- Complex compositions
+
+**Stable Diffusion API (Optional):**
+- Open-source image generation
+- Custom model training
+- Cost-effective alternative
+
+**Image Optimization:**
+- WebP conversion
+- PNG/JPG compression
+- Responsive image generation
+- Format optimization
+
+#### 4.9.6 Coordination Examples
+
+**With Content Manager:**
+```python
+# Content Manager requests featured image for blog post
+content_manager -> designer.generate_blog_image(
+    blog_title="AI Marketing Trends 2025",
+    blog_summary="Comprehensive guide to emerging AI trends in marketing",
+    keywords=["AI", "marketing", "automation"]
+)
+
+# Content Manager requests infographic for data report
+content_manager -> designer.create_infographic(
+    title="Q4 Marketing Performance",
+    data={"Leads": 1500, "Conversions": 450, "ROI": 250},
+    chart_type="bar"
+)
+```
+
+**With Social Media Manager:**
+```python
+# Social Media Manager requests platform-specific graphics
+social_media_manager -> designer.generate_social_graphic(
+    platform="linkedin",
+    content_topic="Product Launch Announcement",
+    include_text=True,
+    text_content="Introducing Our New AI Platform"
+)
+
+# Request variations for A/B testing
+social_media_manager -> designer.generate_design_variations(
+    base_design_id="social_001",
+    variation_count=3,
+    variation_types=["color", "layout"]
+)
+```
+
+**With Campaign Manager:**
+```python
+# Campaign Manager requests ad creative
+campaign_manager -> designer.generate_ad_creative(
+    ad_type="banner",
+    size="leaderboard",
+    message="Transform Your Marketing with AI",
+    call_to_action="Start Free Trial"
+)
+
+# Request email header for campaign
+campaign_manager -> designer.design_email_header(
+    email_type="promotional",
+    subject="Exclusive Offer: 30% Off AI Tools",
+    theme="sale"
+)
+```
+
+**With Copywriter:**
+```python
+# Copywriter requests visual for blog post
+copywriter -> designer.generate_blog_image(
+    blog_title=blog_post.title,
+    blog_summary=blog_post.summary,
+    style="professional"
+)
+```
+
+#### 4.9.7 Brand Guidelines Structure
+
+The Designer enforces comprehensive brand guidelines:
+
+```python
+class BrandGuidelines:
+    """Brand guidelines for consistent visual design."""
+
+    def __init__(
+        self,
+        primary_colors: list[str],
+        secondary_colors: list[str],
+        fonts: dict[str, str],
+        logo_usage: dict[str, Any],
+        visual_style: str,
+        imagery_style: str
+    ):
+        self.primary_colors = primary_colors  # ["#1E40AF", "#3B82F6", "#60A5FA"]
+        self.secondary_colors = secondary_colors  # ["#F59E0B", "#10B981", "#8B5CF6"]
+        self.fonts = fonts  # {"heading": "Montserrat Bold", "body": "Open Sans"}
+        self.logo_usage = logo_usage  # Placement, size, clearspace rules
+        self.visual_style = visual_style  # "modern", "minimal", "bold", "playful"
+        self.imagery_style = imagery_style  # "photography", "illustration", "mixed", "abstract"
+        self.spacing_rules = {"padding": "20px", "margin": "40px"}
+        self.corner_radius = "8px"  # For rounded corners
+        self.shadow_style = "0 4px 6px rgba(0, 0, 0, 0.1)"
+
+    def to_prompt_context(self) -> str:
+        """
+        Convert guidelines to AI image generation prompt context.
+
+        WHY: Provides AI with brand constraints for consistent output.
+        HOW: Formats guidelines as natural language prompt context.
+        """
+        return f"""
+        Brand Visual Guidelines:
+        - Primary colors: {', '.join(self.primary_colors)}
+        - Secondary colors: {', '.join(self.secondary_colors)}
+        - Visual style: {self.visual_style}
+        - Imagery style: {self.imagery_style}
+        - Mood: professional, modern, trustworthy, innovative
+        - Avoid: cluttered layouts, low-contrast colors, outdated styles
+        """
+
+    def validate_design(self, image: Image) -> dict[str, Any]:
+        """
+        Validate design compliance with brand guidelines.
+
+        WHY: Ensures generated designs meet brand standards.
+        HOW: Analyzes colors, composition, style.
+        """
+        validation = {
+            "color_compliance": self._check_color_palette(image),
+            "composition_quality": self._check_composition(image),
+            "style_consistency": self._check_style(image),
+            "overall_score": 0.0
+        }
+
+        # Calculate overall score (weighted average)
+        validation["overall_score"] = (
+            validation["color_compliance"] * 0.40 +
+            validation["composition_quality"] * 0.30 +
+            validation["style_consistency"] * 0.30
+        )
+
+        return validation
+```
+
+#### 4.9.8 Platform Specifications
+
+The Designer maintains platform-specific dimension requirements:
+
+```python
+PLATFORM_SPECS = {
+    "linkedin": {
+        "post": {"width": 1200, "height": 627, "format": "jpg"},
+        "profile_banner": {"width": 1584, "height": 396, "format": "jpg"},
+        "company_logo": {"width": 300, "height": 300, "format": "png"},
+        "story": {"width": 1080, "height": 1920, "format": "jpg"}
+    },
+    "twitter": {
+        "post": {"width": 1200, "height": 675, "format": "jpg"},
+        "header": {"width": 1500, "height": 500, "format": "jpg"},
+        "profile": {"width": 400, "height": 400, "format": "jpg"}
+    },
+    "instagram": {
+        "post": {"width": 1080, "height": 1080, "format": "jpg"},
+        "story": {"width": 1080, "height": 1920, "format": "jpg"},
+        "carousel": {"width": 1080, "height": 1080, "format": "jpg"},
+        "reels": {"width": 1080, "height": 1920, "format": "mp4"}
+    },
+    "facebook": {
+        "post": {"width": 1200, "height": 630, "format": "jpg"},
+        "cover": {"width": 820, "height": 312, "format": "jpg"},
+        "profile": {"width": 180, "height": 180, "format": "jpg"}
+    },
+    "blog": {
+        "featured_image": {"width": 1200, "height": 630, "format": "webp"},
+        "inline_image": {"width": 800, "height": 450, "format": "webp"},
+        "thumbnail": {"width": 400, "height": 225, "format": "webp"}
+    },
+    "email": {
+        "header": {"width": 600, "height": 200, "format": "png"},
+        "banner": {"width": 600, "height": 300, "format": "png"}
+    },
+    "ads": {
+        "leaderboard": {"width": 728, "height": 90, "format": "jpg"},
+        "rectangle": {"width": 300, "height": 250, "format": "jpg"},
+        "skyscraper": {"width": 160, "height": 600, "format": "jpg"},
+        "mobile_banner": {"width": 320, "height": 50, "format": "jpg"}
+    }
+}
+```
+
+#### 4.9.9 Image Quality Validation
+
+The Designer implements comprehensive quality checks:
+
+```python
+async def _validate_brand_compliance(self, image: Image) -> float:
+    """
+    Validate image compliance with brand guidelines.
+
+    WHY: Ensures generated images match brand standards.
+    HOW: Analyzes color palette, composition, style using computer vision.
+
+    Returns:
+        Brand compliance score (0-100)
+    """
+    score = 0.0
+
+    # Analyze color palette (40 points)
+    color_score = await self._analyze_color_compliance(image)
+    score += color_score * 0.40
+
+    # Check composition quality (30 points)
+    composition_score = self._analyze_composition(image)
+    score += composition_score * 0.30
+
+    # Validate style consistency (30 points)
+    style_score = self._analyze_style_consistency(image)
+    score += style_score * 0.30
+
+    return min(score, 100.0)
+
+def _analyze_color_compliance(self, image: Image) -> float:
+    """
+    Analyze color palette compliance with brand colors.
+
+    WHY: Brand colors are critical for visual identity.
+    HOW: Extracts dominant colors and compares to brand palette.
+    """
+    # Guard clause: No brand guidelines
+    if not self._brand_guidelines:
+        return 100.0  # No guidelines to validate against
+
+    # Extract dominant colors from image
+    dominant_colors = self._extract_dominant_colors(image, count=5)
+
+    # Check if dominant colors align with brand colors
+    brand_colors = (
+        self._brand_guidelines.primary_colors +
+        self._brand_guidelines.secondary_colors
+    )
+
+    # Calculate color similarity score
+    matching_colors = 0
+    for dominant_color in dominant_colors:
+        for brand_color in brand_colors:
+            if self._color_similarity(dominant_color, brand_color) > 0.8:
+                matching_colors += 1
+                break
+
+    # Score based on percentage of matching colors
+    return (matching_colors / len(dominant_colors)) * 100.0
+
+def _analyze_composition(self, image: Image) -> float:
+    """
+    Analyze image composition quality.
+
+    WHY: Good composition improves visual appeal and engagement.
+    HOW: Checks rule of thirds, balance, focal points, negative space.
+    """
+    score = 0.0
+
+    # Check aspect ratio appropriateness (25 points)
+    aspect_ratio = image.width / image.height
+    ideal_ratios = [1.0, 1.91, 0.8, 16/9]  # Square, LinkedIn, Portrait, Widescreen
+
+    closest_ratio = min(ideal_ratios, key=lambda x: abs(x - aspect_ratio))
+    if abs(closest_ratio - aspect_ratio) < 0.1:
+        score += 25.0
+    elif abs(closest_ratio - aspect_ratio) < 0.3:
+        score += 15.0
+
+    # Check for focal point (25 points)
+    has_clear_focal_point = self._detect_focal_point(image)
+    if has_clear_focal_point:
+        score += 25.0
+
+    # Check balance (25 points)
+    is_balanced = self._check_visual_balance(image)
+    if is_balanced:
+        score += 25.0
+
+    # Check negative space (25 points)
+    has_adequate_spacing = self._check_negative_space(image)
+    if has_adequate_spacing:
+        score += 25.0
+
+    return score
+```
+
+#### 4.9.10 Architecture Compliance
+
+**Strategy Pattern:**
+```python
+# ✅ CORRECT: Dictionary dispatch
+self._task_handlers = {
+    "generate_social_graphic": self._generate_social_graphic,
+    "generate_blog_image": self._generate_blog_image,
+    # ... other handlers
+}
+
+# ❌ WRONG: if/elif chains
+if task.task_type == "generate_social_graphic":
+    return await self._generate_social_graphic(task)
+elif task.task_type == "generate_blog_image":
+    return await self._generate_blog_image(task)
+```
+
+**Guard Clauses:**
+```python
+# ✅ CORRECT: Guard clause for early return
+async def _generate_social_graphic(self, task: Task) -> dict[str, Any]:
+    platform = task.parameters.get("platform")
+
+    # Guard clause: Validate platform
+    if platform not in self._platform_specs:
+        return {"error": f"Unsupported platform: {platform}", "image_url": None}
+
+    # Guard clause: Check if image generator available
+    if not self._dalle_client:
+        return {"error": "Image generator not configured", "image_url": None}
+
+    # Main logic here
+    return await self._generate_image(task)
+
+# ❌ WRONG: Nested if statements
+async def _generate_social_graphic(self, task: Task) -> dict[str, Any]:
+    platform = task.parameters.get("platform")
+
+    if platform in self._platform_specs:
+        if self._dalle_client:
+            # Deep nesting
+            return await self._generate_image(task)
+```
+
+**Exception Wrapping:**
+```python
+# ✅ CORRECT: Wrap external API calls
+try:
+    image = await self._dalle_client.generate(prompt=prompt, size=size)
+except Exception as e:
+    raise AgentExecutionError(
+        agent_id=self.agent_id,
+        task_id=task.task_id,
+        message=f"DALL-E API failed: {str(e)}",
+        original_exception=e
+    )
+
+# ❌ WRONG: Let exceptions propagate
+image = await self._dalle_client.generate(prompt=prompt, size=size)
+```
+
+---
+
 ## 5. Data Models
 
 ### 5.1 Core Entities
