@@ -765,78 +765,219 @@ class StrategyAgent:
 - Supporting evidence and citations
 - Actionable next steps
 
-### 4.3 Content Agent
+### 4.3 Content Manager Agent (Management Layer)
 
-**Purpose**: Generate high-quality marketing content
+**Purpose**: Management-layer agent coordinating content creation, ensuring quality, and managing editorial calendar.
+
+**Role in Hierarchy**: Management Layer - supervises specialist agents (Copywriter, SEO Specialist, Designer) and coordinates with Campaign and Social Media Managers.
 
 **Responsibilities**:
-- Create blog posts and articles
-- Write case studies and whitepapers
-- Generate email copy
-- Produce thought leadership content
-- Ensure brand voice consistency
-- SEO optimization
+- Manage content strategy and editorial calendar
+- Coordinate content creation across specialist agents
+- Ensure content quality and brand consistency
+- Track content performance and ROI
+- Brief specialists on content requirements
+- Review and approve content before publishing
+- Optimize content for engagement and SEO
+- Manage content library and versioning
+
+**Supported Task Types**:
+
+1. **create_content**: Coordinate specialists to create content
+2. **review_content**: Review and approve/reject content for quality
+3. **schedule_content**: Add content to editorial calendar
+4. **generate_content_ideas**: Generate content ideas aligned with strategy
+5. **optimize_content**: Optimize existing content for SEO/engagement
+6. **get_content_performance**: Track content metrics across channels
+7. **manage_content_calendar**: Manage editorial calendar and deadlines
+8. **brief_specialists**: Create detailed content briefs for specialists
 
 **Key Methods**:
 
 ```python
-class ContentAgent:
-    def generate_blog_post(
-        self,
-        topic: str,
-        target_audience: str,
-        keywords: List[str],
-        tone: str = "professional"
-    ) -> BlogPost
+class ContentManagerAgent(BaseAgent):
+    """
+    Management-layer agent for content coordination.
 
-    def create_case_study(
-        self,
-        client_name: str,
-        challenge: str,
-        solution: str,
-        results: Dict[str, Any]
-    ) -> CaseStudy
+    WHY: Provides unified content strategy and quality control.
+    HOW: Coordinates specialists, manages calendar, enforces standards.
+    """
 
-    def write_whitepaper(
+    async def _create_content(
         self,
-        topic: str,
-        sections: List[str],
-        target_length: int = 3000
-    ) -> Whitepaper
+        task: Task
+    ) -> dict[str, Any]:
+        """
+        WHY: Coordinate multi-specialist content creation.
+        HOW: Delegates to Copywriter, SEO, Designer; manages workflow.
+        """
 
-    def generate_email_copy(
+    async def _review_content(
         self,
-        campaign_type: CampaignType,
-        audience_segment: str,
-        goal: str
-    ) -> EmailCopy
+        task: Task
+    ) -> dict[str, Any]:
+        """
+        WHY: Ensure content meets quality and brand standards.
+        HOW: Reviews against criteria, approves/rejects/requests revisions.
+        """
+
+    async def _schedule_content(
+        self,
+        task: Task
+    ) -> dict[str, Any]:
+        """
+        WHY: Plan content publication for optimal timing.
+        HOW: Adds to editorial calendar, checks conflicts, sets deadlines.
+        """
+
+    async def _generate_content_ideas(
+        self,
+        task: Task
+    ) -> dict[str, Any]:
+        """
+        WHY: Align content creation with marketing strategy.
+        HOW: Analyzes trends, audience needs, campaign objectives.
+        """
+
+    async def _optimize_content(
+        self,
+        task: Task
+    ) -> dict[str, Any]:
+        """
+        WHY: Improve performance of existing content.
+        HOW: Delegates to SEO Specialist for optimization.
+        """
+
+    async def _get_content_performance(
+        self,
+        task: Task
+    ) -> dict[str, Any]:
+        """
+        WHY: Track content effectiveness and ROI.
+        HOW: Aggregates metrics from all channels, calculates ROI.
+        """
+
+    async def _manage_content_calendar(
+        self,
+        task: Task
+    ) -> dict[str, Any]:
+        """
+        WHY: Organize content production and publication.
+        HOW: Manages calendar state, deadlines, dependencies.
+        """
+
+    async def _brief_specialists(
+        self,
+        task: Task
+    ) -> dict[str, Any]:
+        """
+        WHY: Provide clear direction for content creation.
+        HOW: Creates detailed briefs with requirements, goals, constraints.
+        """
 ```
 
-**Quality Assurance**:
-- Brand voice validation (score > 70/100)
-- Readability check (Flesch-Kincaid grade level)
-- SEO optimization (keyword density, meta tags)
-- Fact-checking (verify statistics and claims)
-- Plagiarism detection
+**State Management**:
+- **Editorial Calendar**: Scheduled content, deadlines, publication dates
+- **Content Library**: Created, published, archived content with metadata
+- **Content Briefs**: Active briefs for specialists
+- **Quality Standards**: Brand voice criteria, SEO requirements, style guidelines
+- **Performance Data**: Content metrics, engagement rates, conversion data
+- **Specialist Registry**: References to Copywriter, SEO, Designer agents
 
-**Content Structure**:
+**Delegation Pattern**:
+
 ```python
-@dataclass
-class BlogPost:
-    title: str
-    subtitle: Optional[str]
-    author: str
-    content: str  # Markdown format
-    keywords: List[str]
-    meta_description: str
-    category: str
-    tags: List[str]
-    seo_score: float
-    brand_voice_score: float
-    estimated_read_time: int
-    created_at: datetime
-    status: ContentStatus  # draft, review, approved, published
+# Content Manager maintains registry of specialist agents
+self._specialists: dict[AgentRole, BaseAgent] = {
+    AgentRole.COPYWRITER: copywriter_instance,
+    AgentRole.SEO_SPECIALIST: seo_specialist_instance,
+    AgentRole.DESIGNER: designer_instance,
+}
+
+# Delegates content creation through specialist layer
+async def _create_content(self, task: Task):
+    # Delegate to Copywriter for draft
+    copywriter = self._specialists[AgentRole.COPYWRITER]
+    draft_task = self._create_specialist_task(...)
+    draft = await copywriter.execute(draft_task)
+
+    # Delegate to SEO Specialist for optimization
+    seo = self._specialists[AgentRole.SEO_SPECIALIST]
+    seo_task = self._create_specialist_task(...)
+    optimized = await seo.execute(seo_task)
+
+    # Store in content library
+    content_id = self._store_content(optimized)
+
+    return {"content_id": content_id, "status": "ready_for_review"}
 ```
+
+**Content Lifecycle States**:
+
+```python
+CONTENT_STATES = {
+    "draft": "Initial draft created by Copywriter",
+    "review": "Under review by Content Manager",
+    "revision": "Needs revision - sent back to specialists",
+    "approved": "Approved for publishing",
+    "scheduled": "Scheduled for publication",
+    "published": "Published to channels",
+    "archived": "Archived content"
+}
+```
+
+**Architecture Compliance**:
+- ✅ **Strategy Pattern**: Dictionary dispatch for all task types (zero if/elif chains)
+- ✅ **Guard Clauses**: Early returns for validation, no nested ifs
+- ✅ **Full Type Hints**: All methods fully typed with return types
+- ✅ **WHY/HOW Documentation**: Every method documents reasoning and implementation
+- ✅ **Exception Wrapping**: All external calls wrapped with AgentExecutionError
+- ✅ **Graceful Degradation**: Continues operating if individual specialists fail
+- ✅ **TDD Methodology**: Tests written first (RED-GREEN-REFACTOR)
+
+**Error Handling**:
+- Wrap all specialist execution calls in try-except blocks
+- Continue with partial content if some specialists fail
+- Log failed delegations for later retry
+- Never block content pipeline due to specialist failures
+
+**Quality Assurance Criteria**:
+
+```python
+def _evaluate_content_quality(self, content: dict[str, Any]) -> dict[str, Any]:
+    """
+    WHY: Ensure content meets brand and quality standards.
+    HOW: Evaluates against multiple criteria, returns pass/fail.
+
+    Quality Criteria:
+    - Brand voice consistency (score > 70/100)
+    - Readability (Flesch-Kincaid grade level appropriate)
+    - SEO optimization (keyword density, meta tags present)
+    - Grammar and spelling (zero critical errors)
+    - Content structure (proper headings, formatting)
+    - Call-to-action present (if required)
+    """
+```
+
+**Integration with Other Managers**:
+
+```
+Content Manager
+    │
+    ├─> Campaign Manager (receives content requests for campaigns)
+    ├─> Social Media Manager (provides content for social posts)
+    ├─> Copywriter (delegates writing tasks)
+    ├─> SEO Specialist (delegates optimization)
+    └─> Designer (delegates visual creation)
+```
+
+**Future Enhancements**:
+- AI-powered content idea generation
+- Automated A/B testing for content variations
+- Content personalization for audience segments
+- Integration with CMS (WordPress, HubSpot)
+- Automated content repurposing across formats
+- Content gap analysis and opportunity identification
 
 ### 4.4 Social Media Agent
 
