@@ -1088,62 +1088,624 @@ class CampaignAgent:
 - Unsubscribe rate
 - Revenue per email
 
-### 4.6 Analytics Agent
+### 4.6 Analytics Specialist Agent (Specialist Layer)
 
-**Purpose**: Performance tracking and optimization
+**Layer**: Specialist Layer (Execution & Expertise)
+**Role**: Data analysis, performance tracking, insights generation
+**Reports To**: CMO, Campaign Manager, Social Media Manager, Content Manager
 
-**Responsibilities**:
-- Track KPIs across all channels
-- Identify trends and patterns
-- Provide optimization recommendations
-- Generate reports
-- Predict future performance
+**Purpose**: Provide comprehensive analytics, performance tracking, and data-driven insights across all marketing channels.
 
-**Key Methods**:
+**WHY**: Unified analytics capability ensures data-driven decision-making across all management layers, tracks campaign effectiveness, and provides actionable insights for optimization.
+
+**Architecture Compliance**:
+- ✅ Strategy Pattern (dictionary dispatch for task routing)
+- ✅ Guard clauses only (no nested ifs)
+- ✅ Full type hints on all methods
+- ✅ WHY/HOW documentation
+- ✅ Exception wrapping with `AgentExecutionError`
+- ✅ Graceful degradation
+- ✅ TDD methodology
+
+---
+
+#### 4.6.1 Core Responsibilities
+
+1. **Performance Tracking**: Track metrics across all marketing channels (web, social, campaigns)
+2. **Report Generation**: Create comprehensive analytical reports for management agents
+3. **KPI Monitoring**: Monitor key performance indicators against targets
+4. **Audience Analysis**: Analyze audience demographics, behavior, and engagement
+5. **Conversion Tracking**: Track conversion funnels and attribution
+6. **Data Integration**: Integrate with Google Analytics, social media APIs, internal database
+7. **Insights Generation**: Generate data-driven insights and recommendations
+8. **Real-Time Monitoring**: Track ongoing campaign performance in real-time
+
+---
+
+#### 4.6.2 Task Types (Strategy Pattern)
+
+The Analytics Specialist supports 8 task types using Strategy Pattern (zero if/elif chains):
 
 ```python
-class AnalyticsAgent:
-    def generate_performance_report(
-        self,
-        timeframe: str,
-        channels: List[Channel],
-        metrics: List[Metric]
-    ) -> PerformanceReport
+class AnalyticsSpecialistAgent(BaseAgent):
+    """
+    Specialist-layer agent for analytics and performance tracking.
 
-    def identify_trends(
-        self,
-        data_points: List[DataPoint],
-        window: str = "30 days"
-    ) -> TrendAnalysis
+    WHY: Provides unified analytics capability across all marketing channels.
+    HOW: Integrates with external APIs (Google Analytics, social media) and
+         internal database to track, analyze, and report on marketing performance.
+    """
 
-    def recommend_optimizations(
-        self,
-        current_performance: Dict[str, float],
-        goals: Dict[str, float]
-    ) -> List[Recommendation]
+    def __init__(self, config: AgentConfig):
+        """
+        Initialize Analytics Specialist Agent.
 
-    def predict_performance(
-        self,
-        historical_data: DataFrame,
-        forecast_period: str = "30 days"
-    ) -> Forecast
+        WHY: Set up analytics integrations and task handler registry.
+        HOW: Initializes external API clients, caching system, and
+             registers task handlers using Strategy Pattern.
+        """
+        super().__init__(config)
+
+        # External integrations
+        self._google_analytics_client: Optional[GoogleAnalyticsClient] = None
+        self._social_media_clients: dict[str, Any] = {}
+
+        # Caching for API rate limiting
+        self._analytics_cache: dict[str, tuple[datetime, dict[str, Any]]] = {}
+        self._cache_ttl_minutes: int = 30
+
+        # Metrics storage
+        self._tracked_metrics: dict[str, dict[str, Any]] = {}
+
+        # Strategy Pattern: Dictionary dispatch (zero if/elif chains)
+        self._task_handlers: dict[
+            str, Callable[[Task], Coroutine[Any, Any, dict[str, Any]]]
+        ] = {
+            "track_campaign_performance": self._track_campaign_performance,
+            "generate_report": self._generate_report,
+            "analyze_audience": self._analyze_audience,
+            "monitor_kpis": self._monitor_kpis,
+            "track_conversions": self._track_conversions,
+            "get_social_analytics": self._get_social_analytics,
+            "get_web_analytics": self._get_web_analytics,
+            "generate_insights": self._generate_insights,
+        }
 ```
 
-**Key Metrics**:
+---
 
-| Category | Metrics |
-|----------|---------|
-| **Traffic** | Sessions, Users, Page Views, Bounce Rate |
-| **Engagement** | Likes, Comments, Shares, Time on Page |
-| **Conversion** | Lead Form Fills, Demo Requests, Trial Signups |
-| **Revenue** | MQL→SQL Rate, Sales Velocity, Customer LTV |
-| **Content** | Top Performing Posts, Content Type ROI |
+#### 4.6.3 Task Type Specifications
 
-**Reporting Cadence**:
-- **Daily**: Social media engagement, website traffic
-- **Weekly**: Content performance, campaign metrics
-- **Monthly**: Comprehensive marketing dashboard
-- **Quarterly**: Strategic review and planning
+##### 1. track_campaign_performance
+
+**Purpose**: Track comprehensive metrics for specific campaigns.
+
+**Parameters**:
+```python
+{
+    "campaign_id": str,              # Campaign to track
+    "metrics": List[str],            # Metrics to track (impressions, clicks, conversions, ROI)
+    "date_range": str,               # Date range (e.g., "last_7_days", "2025-01-01_2025-01-31")
+}
+```
+
+**Returns**:
+```python
+{
+    "campaign_id": str,
+    "metrics": {
+        "impressions": int,
+        "clicks": int,
+        "ctr": float,              # Click-through rate
+        "conversions": int,
+        "conversion_rate": float,
+        "cost": float,
+        "cpc": float,              # Cost per click
+        "roi": float,              # Return on investment
+    },
+    "date_range": str,
+    "timestamp": str,
+}
+```
+
+**Implementation**:
+```python
+async def _track_campaign_performance(self, task: Task) -> dict[str, Any]:
+    """
+    Track performance metrics for a specific campaign.
+
+    WHY: Provides campaign managers with performance data for optimization.
+    HOW: Aggregates metrics from multiple sources (web analytics, social media,
+         internal database) and calculates derived metrics (CTR, ROI).
+    """
+    campaign_id = task.parameters["campaign_id"]
+    metrics = task.parameters.get("metrics", ["impressions", "clicks", "conversions"])
+    date_range = task.parameters["date_range"]
+
+    # Guard clause: Validate campaign exists
+    if not self._campaign_exists(campaign_id):
+        return {
+            "error": f"Campaign {campaign_id} not found",
+            "campaign_id": campaign_id,
+        }
+
+    # Aggregate metrics from multiple sources
+    aggregated_metrics = await self._aggregate_campaign_metrics(
+        campaign_id=campaign_id,
+        metrics=metrics,
+        date_range=date_range
+    )
+
+    return {
+        "campaign_id": campaign_id,
+        "metrics": aggregated_metrics,
+        "date_range": date_range,
+        "timestamp": datetime.now().isoformat(),
+    }
+```
+
+##### 2. generate_report
+
+**Purpose**: Generate comprehensive analytical reports.
+
+**Parameters**:
+```python
+{
+    "report_type": str,          # "executive_dashboard", "campaign_performance", "content_performance"
+    "date_range": str,           # Date range for report
+    "include_charts": bool,      # Whether to include visualization data
+}
+```
+
+**Returns**:
+```python
+{
+    "report_id": str,
+    "report_type": str,
+    "summary": {
+        "key_metrics": dict[str, Any],
+        "highlights": List[str],
+        "concerns": List[str],
+    },
+    "detailed_data": dict[str, Any],
+    "recommendations": List[str],
+    "generated_at": str,
+}
+```
+
+##### 3. analyze_audience
+
+**Purpose**: Analyze audience demographics, behavior, and segments.
+
+**Parameters**:
+```python
+{
+    "analysis_type": str,        # "demographics", "behavior", "interests"
+    "date_range": str,
+    "segments": List[str],       # Optional audience segments
+}
+```
+
+**Returns**:
+```python
+{
+    "demographics": {
+        "age_distribution": dict[str, float],
+        "gender_distribution": dict[str, float],
+        "location_distribution": dict[str, float],
+    },
+    "behavior": {
+        "device_usage": dict[str, float],
+        "visit_frequency": dict[str, int],
+        "engagement_patterns": dict[str, Any],
+    },
+    "interests": List[dict[str, Any]],
+    "segments": dict[str, dict[str, Any]],
+}
+```
+
+##### 4. monitor_kpis
+
+**Purpose**: Monitor key performance indicators against targets.
+
+**Parameters**:
+```python
+{
+    "kpi_names": List[str],      # KPIs to monitor
+    "targets": dict[str, float], # Target values for KPIs
+    "alert_threshold": float,    # % deviation to trigger alert (e.g., 0.1 = 10%)
+}
+```
+
+**Returns**:
+```python
+{
+    "kpis": {
+        "kpi_name": {
+            "current_value": float,
+            "target_value": float,
+            "variance": float,      # % difference from target
+            "status": str,          # "on_track", "at_risk", "below_target"
+        }
+    },
+    "alerts": List[dict[str, Any]],  # KPIs that need attention
+    "timestamp": str,
+}
+```
+
+##### 5. track_conversions
+
+**Purpose**: Track conversion funnels and attribution.
+
+**Parameters**:
+```python
+{
+    "funnel_name": str,          # Conversion funnel to track
+    "date_range": str,
+    "attribution_model": str,    # "first_touch", "last_touch", "linear"
+}
+```
+
+**Returns**:
+```python
+{
+    "funnel_name": str,
+    "stages": {
+        "stage_name": {
+            "count": int,
+            "conversion_rate": float,  # % to next stage
+            "drop_off_rate": float,
+        }
+    },
+    "attribution": dict[str, dict[str, Any]],
+    "total_conversions": int,
+}
+```
+
+##### 6. get_social_analytics
+
+**Purpose**: Retrieve social media analytics across platforms.
+
+**Parameters**:
+```python
+{
+    "platforms": List[str],      # ["linkedin", "twitter", "bluesky"]
+    "metrics": List[str],        # ["engagement", "reach", "followers"]
+    "date_range": str,
+}
+```
+
+**Returns**:
+```python
+{
+    "platforms": {
+        "platform_name": {
+            "followers": int,
+            "engagement_rate": float,
+            "reach": int,
+            "impressions": int,
+            "top_posts": List[dict[str, Any]],
+        }
+    },
+    "aggregated": {
+        "total_followers": int,
+        "avg_engagement_rate": float,
+        "total_reach": int,
+    },
+}
+```
+
+##### 7. get_web_analytics
+
+**Purpose**: Retrieve website analytics from Google Analytics.
+
+**Parameters**:
+```python
+{
+    "metrics": List[str],        # ["sessions", "pageviews", "bounceRate"]
+    "dimensions": List[str],     # ["page", "source", "device"]
+    "date_range": str,
+}
+```
+
+**Returns**:
+```python
+{
+    "metrics": dict[str, Any],
+    "dimensions": dict[str, dict[str, Any]],
+    "top_pages": List[dict[str, Any]],
+    "traffic_sources": dict[str, int],
+    "date_range": str,
+}
+```
+
+##### 8. generate_insights
+
+**Purpose**: Generate data-driven insights and recommendations.
+
+**Parameters**:
+```python
+{
+    "focus_area": str,           # "campaigns", "content", "audience"
+    "date_range": str,
+}
+```
+
+**Returns**:
+```python
+{
+    "insights": List[{
+        "title": str,
+        "description": str,
+        "impact": str,           # "high", "medium", "low"
+        "supporting_data": dict[str, Any],
+    }],
+    "recommendations": List[{
+        "action": str,
+        "rationale": str,
+        "expected_impact": str,
+        "priority": str,
+    }],
+}
+```
+
+---
+
+#### 4.6.4 Integration Points
+
+**External APIs**:
+- **Google Analytics API**: Website traffic, user behavior, conversions
+- **LinkedIn Analytics API**: Post engagement, follower growth, demographics
+- **Twitter Analytics API**: Tweet performance, audience insights
+- **Bluesky Analytics**: Post metrics (when available)
+
+**Internal Database**:
+- Campaign metadata and performance
+- Content performance metrics
+- Historical analytics data
+
+**Caching Strategy**:
+```python
+async def _get_cached_or_fetch(
+    self,
+    cache_key: str,
+    fetch_fn: Callable[[], Coroutine[Any, Any, dict[str, Any]]]
+) -> dict[str, Any]:
+    """
+    Get data from cache or fetch fresh data.
+
+    WHY: Reduces API calls and respects rate limits.
+    HOW: Checks cache with TTL, returns cached data if fresh,
+         otherwise fetches and caches new data.
+    """
+    # Guard clause: Check cache
+    if cache_key in self._analytics_cache:
+        cached_time, cached_data = self._analytics_cache[cache_key]
+        time_elapsed = datetime.now() - cached_time
+
+        if time_elapsed < timedelta(minutes=self._cache_ttl_minutes):
+            return cached_data
+
+    # Fetch fresh data
+    try:
+        fresh_data = await fetch_fn()
+        self._analytics_cache[cache_key] = (datetime.now(), fresh_data)
+        return fresh_data
+    except Exception as e:
+        # Graceful degradation: Return stale cache if available
+        if cache_key in self._analytics_cache:
+            _, stale_data = self._analytics_cache[cache_key]
+            return {**stale_data, "warning": "Using stale cached data"}
+
+        raise AgentExecutionError(
+            agent_id=self.agent_id,
+            task_id="unknown",
+            message=f"Failed to fetch analytics data: {str(e)}",
+            original_exception=e
+        )
+```
+
+---
+
+#### 4.6.5 Key Metrics Tracked
+
+**Campaign Metrics**:
+```python
+CAMPAIGN_METRICS = {
+    "impressions": "Number of times content was displayed",
+    "clicks": "Number of clicks on content",
+    "ctr": "Click-through rate (clicks/impressions)",
+    "conversions": "Number of conversions",
+    "conversion_rate": "Conversion rate (conversions/clicks)",
+    "cost": "Total campaign cost",
+    "cpc": "Cost per click",
+    "cpa": "Cost per acquisition",
+    "roi": "Return on investment",
+    "engagement_rate": "Social media engagement rate",
+}
+```
+
+**Audience Metrics**:
+```python
+AUDIENCE_METRICS = {
+    "demographics": "Age, gender, location distribution",
+    "interests": "Audience interests and affinities",
+    "devices": "Device usage (mobile, desktop, tablet)",
+    "behavior": "User behavior patterns",
+    "segments": "Audience segments and personas",
+}
+```
+
+**Content Metrics**:
+```python
+CONTENT_METRICS = {
+    "views": "Total content views",
+    "time_on_page": "Average time spent on content",
+    "scroll_depth": "How far users scroll",
+    "shares": "Social media shares",
+    "comments": "Number of comments",
+    "bounce_rate": "% of single-page sessions",
+}
+```
+
+**Web Analytics Metrics**:
+```python
+WEB_METRICS = {
+    "sessions": "Total website sessions",
+    "users": "Unique users",
+    "pageviews": "Total page views",
+    "bounce_rate": "% of single-page sessions",
+    "avg_session_duration": "Average session duration",
+    "pages_per_session": "Average pages per session",
+}
+```
+
+---
+
+#### 4.6.6 Graceful Degradation
+
+**Strategy**: Analytics Specialist continues operating even when external APIs fail.
+
+```python
+async def _aggregate_campaign_metrics(
+    self,
+    campaign_id: str,
+    metrics: List[str],
+    date_range: str
+) -> dict[str, Any]:
+    """
+    Aggregate metrics from multiple sources with graceful degradation.
+
+    WHY: Ensures partial results even if some sources fail.
+    HOW: Attempts to fetch from all sources, logs failures, returns
+         aggregated data from successful sources.
+    """
+    aggregated = {}
+    errors = []
+
+    # Try Google Analytics
+    try:
+        web_data = await self._fetch_web_analytics(campaign_id, date_range)
+        aggregated.update(web_data)
+    except Exception as e:
+        errors.append(f"Google Analytics unavailable: {str(e)}")
+
+    # Try social media APIs
+    try:
+        social_data = await self._fetch_social_analytics(campaign_id, date_range)
+        aggregated.update(social_data)
+    except Exception as e:
+        errors.append(f"Social media analytics unavailable: {str(e)}")
+
+    # Always try internal database
+    try:
+        db_data = await self._fetch_database_metrics(campaign_id, date_range)
+        aggregated.update(db_data)
+    except Exception as e:
+        errors.append(f"Database unavailable: {str(e)}")
+
+    # Add warnings if any sources failed
+    if errors:
+        aggregated["warnings"] = errors
+        aggregated["partial_data"] = True
+
+    return aggregated
+```
+
+---
+
+#### 4.6.7 Testing Strategy
+
+**Unit Tests** (12+ tests):
+- All 8 task types with mocked external APIs
+- Caching logic verification
+- Graceful degradation scenarios
+- Metric calculation accuracy
+- API failure handling
+
+**Integration Tests** (6+ tests):
+- Full workflows with real database, mocked external APIs
+- Cross-source data aggregation
+- Report generation with multiple data sources
+- Real-time KPI monitoring
+- Cache performance under load
+
+**Example Test**:
+```python
+@pytest.mark.asyncio
+async def test_track_campaign_performance(
+    self, agent_config, mock_google_analytics, mock_social_apis
+):
+    """Test tracking campaign performance with multiple data sources."""
+    agent = AnalyticsSpecialistAgent(config=agent_config)
+    agent._google_analytics_client = mock_google_analytics
+    agent._social_media_clients = mock_social_apis
+
+    task = Task(
+        task_type="track_campaign_performance",
+        parameters={
+            "campaign_id": "campaign_001",
+            "metrics": ["impressions", "clicks", "conversions"],
+            "date_range": "last_7_days",
+        }
+    )
+
+    result = await agent.execute(task)
+
+    assert result.status == TaskStatus.COMPLETED
+    assert "metrics" in result.result
+    assert result.result["metrics"]["impressions"] > 0
+    mock_google_analytics.get_analytics.assert_called()
+```
+
+---
+
+#### 4.6.8 Performance Considerations
+
+**Caching**:
+- Cache TTL: 30 minutes for most analytics data
+- Cache key format: `{source}:{metric}:{date_range}`
+- Cache invalidation: On-demand when fresh data required
+
+**Rate Limiting**:
+- Google Analytics: 10 queries per second
+- Social Media APIs: Platform-specific limits
+- Batch queries when possible to minimize API calls
+
+**Data Freshness**:
+- Real-time metrics: No caching (campaign monitoring)
+- Daily metrics: 30-minute cache
+- Historical metrics: 24-hour cache
+
+---
+
+#### 4.6.9 Coordination with Management Agents
+
+```python
+# CMO requests executive dashboard
+cmo -> analytics_specialist.generate_report(
+    report_type="executive_dashboard",
+    date_range="Q1_2025"
+)
+
+# Campaign Manager tracks campaign performance
+campaign_manager -> analytics_specialist.track_campaign_performance(
+    campaign_id="campaign_001",
+    metrics=["impressions", "conversions", "roi"]
+)
+
+# Social Media Manager gets social analytics
+social_media_manager -> analytics_specialist.get_social_analytics(
+    platforms=["linkedin", "twitter"],
+    date_range="last_30_days"
+)
+
+# Content Manager tracks content performance
+content_manager -> analytics_specialist.get_web_analytics(
+    metrics=["pageviews", "time_on_page", "bounce_rate"],
+    dimensions=["page"]
+)
+```
 
 ---
 
