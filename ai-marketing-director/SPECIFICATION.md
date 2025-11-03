@@ -4841,6 +4841,1597 @@ campaign = await self._esp_client.create_campaign(...)
 
 ---
 
+### 4.11 Market Research Agent (Specialist Layer)
+
+The **Market Research Agent** is a specialist-layer agent providing market intelligence, competitive analysis, trend identification, and research capabilities to support strategic marketing decisions.
+
+**Agent Role:** `AgentRole.MARKET_RESEARCH`
+
+**Supervised By:** CMO, Campaign Manager, Content Manager
+
+**Coordinates With:** Analytics Specialist (internal metrics), Content Manager (trend insights), Campaign Manager (competitive intelligence)
+
+**External Integrations:** Crunchbase API, SimilarWeb API, Google Trends API, News API
+
+#### Architecture
+
+```python
+class MarketResearchAgent(BaseAgent):
+    """
+    Specialist-layer agent for market research and competitive intelligence.
+
+    WHY: Provides market insights, competitive analysis, and trend identification
+         to support data-driven marketing strategy.
+    HOW: Uses third-party research APIs (Crunchbase, SimilarWeb, Google Trends)
+         with AI-powered analysis and trend detection.
+    """
+
+    def __init__(
+        self,
+        config: AgentConfig,
+        crunchbase_api_key: Optional[str] = None,
+        similarweb_api_key: Optional[str] = None,
+        news_api_key: Optional[str] = None
+    ):
+        super().__init__(config)
+
+        # External API clients
+        self._crunchbase_client: Optional[CrunchbaseClient] = None
+        self._similarweb_client: Optional[SimilarWebClient] = None
+        self._google_trends_client: Optional[GoogleTrendsClient] = None
+        self._news_api_client: Optional[NewsAPIClient] = None
+
+        # Initialize clients if API keys provided
+        if crunchbase_api_key:
+            self._crunchbase_client = CrunchbaseClient(api_key=crunchbase_api_key)
+        if similarweb_api_key:
+            self._similarweb_client = SimilarWebClient(api_key=similarweb_api_key)
+        if news_api_key:
+            self._news_api_client = NewsAPIClient(api_key=news_api_key)
+
+        self._google_trends_client = GoogleTrendsClient()  # No API key required
+
+        # Research cache (24-hour TTL for market data)
+        self._research_cache: dict[str, tuple[dict[str, Any], datetime]] = {}
+        self._cache_ttl = timedelta(hours=24)
+
+        # Competitor tracking state
+        self._tracked_competitors: dict[str, dict[str, Any]] = {}
+
+        # Strategy Pattern: Dictionary dispatch for task routing
+        self._task_handlers: dict[
+            str, Callable[[Task], Coroutine[Any, Any, dict[str, Any]]]
+        ] = {
+            "analyze_competitor": self._analyze_competitor,
+            "identify_market_trends": self._identify_market_trends,
+            "analyze_sentiment": self._analyze_sentiment,
+            "research_industry": self._research_industry,
+            "perform_swot_analysis": self._perform_swot_analysis,
+            "track_competitor_activity": self._track_competitor_activity,
+            "identify_opportunities": self._identify_opportunities,
+            "generate_market_insights": self._generate_market_insights,
+        }
+
+        self.logger.info(
+            f"Market Research Agent initialized: {self.agent_id}",
+            extra={"api_clients_configured": self._count_configured_clients()}
+        )
+
+    def _count_configured_clients(self) -> int:
+        """Count number of configured API clients."""
+        count = 0
+        if self._crunchbase_client:
+            count += 1
+        if self._similarweb_client:
+            count += 1
+        if self._news_api_client:
+            count += 1
+        return count
+
+    async def _execute_task(self, task: Task) -> dict[str, Any]:
+        """
+        Execute market research task using Strategy Pattern.
+
+        WHY: Routes tasks to appropriate handlers without if/elif chains.
+        HOW: Uses dictionary dispatch for clean task delegation.
+        """
+        # Guard clause: Check if task type is supported
+        handler = self._task_handlers.get(task.task_type)
+        if not handler:
+            raise ValueError(f"Unsupported task type: {task.task_type}")
+
+        # Guard clause: Validate task before execution
+        if not await self.validate_task(task):
+            raise ValueError(f"Task validation failed for {task.task_id}")
+
+        try:
+            # Execute task handler
+            result = await handler(task)
+            return result
+
+        except Exception as e:
+            raise AgentExecutionError(
+                agent_id=self.agent_id,
+                task_id=task.task_id,
+                message=f"Market research task execution failed: {str(e)}",
+                original_exception=e
+            )
+
+    async def validate_task(self, task: Task) -> bool:
+        """
+        Validate task parameters before execution.
+
+        WHY: Ensures tasks have required parameters for successful execution.
+        HOW: Checks for required fields based on task type.
+        """
+        required_params = {
+            "analyze_competitor": ["competitor_name"],
+            "identify_market_trends": ["topic"],
+            "analyze_sentiment": ["source"],
+            "research_industry": ["industry"],
+            "perform_swot_analysis": ["company_name"],
+            "track_competitor_activity": ["competitor_name"],
+            "identify_opportunities": ["market_segment"],
+            "generate_market_insights": ["data_sources"],
+        }
+
+        # Guard clause: Check if task type is known
+        if task.task_type not in required_params:
+            return False
+
+        # Check required parameters
+        for param in required_params[task.task_type]:
+            if param not in task.parameters:
+                self.logger.warning(
+                    f"Missing required parameter: {param}",
+                    extra={"task_id": task.task_id, "task_type": task.task_type}
+                )
+                return False
+
+        return True
+```
+
+#### Task Type 1: Analyze Competitor
+
+**Purpose:** Analyze competitor strategy, products, positioning, and market presence.
+
+**Parameters:**
+- `competitor_name` (str): Name of competitor to analyze
+- `competitor_website` (str, optional): Website URL of competitor
+- `analysis_depth` (str, optional): Analysis depth (basic, standard, deep) - default: standard
+- `include_traffic_data` (bool, optional): Include web traffic metrics - default: True
+- `include_funding_data` (bool, optional): Include funding/financial data - default: True
+
+**Returns:**
+```python
+{
+    "competitor_name": "Competitor Inc",
+    "website": "https://competitor.com",
+    "overview": {
+        "description": "AI-powered marketing automation platform",
+        "founded_year": 2018,
+        "headquarters": "San Francisco, CA",
+        "employee_count": "201-500",
+        "estimated_revenue": "$10M-$50M"
+    },
+    "products": [
+        {
+            "name": "AI Marketing Suite",
+            "category": "Marketing Automation",
+            "pricing_model": "Subscription",
+            "target_market": "Enterprise B2B"
+        }
+    ],
+    "positioning": {
+        "value_proposition": "AI-first marketing automation for enterprise",
+        "key_differentiators": ["Advanced AI", "Enterprise features", "Integration ecosystem"],
+        "target_audience": "Enterprise marketing teams (500+ employees)"
+    },
+    "traffic_metrics": {
+        "monthly_visits": 450000,
+        "traffic_sources": {
+            "direct": 35.2,
+            "search": 28.5,
+            "social": 15.3,
+            "referral": 21.0
+        },
+        "top_countries": ["United States", "United Kingdom", "Canada"],
+        "engagement_rate": 62.5,
+        "bounce_rate": 37.5
+    },
+    "funding": {
+        "total_funding": "$45M",
+        "last_round": "Series B",
+        "last_round_date": "2024-03-15",
+        "investors": ["Accel", "Sequoia Capital"]
+    },
+    "social_presence": {
+        "linkedin_followers": 25000,
+        "twitter_followers": 15000,
+        "engagement_score": 7.8
+    },
+    "analysis_timestamp": "2025-11-03T10:00:00Z"
+}
+```
+
+**Implementation:**
+```python
+async def _analyze_competitor(self, task: Task) -> dict[str, Any]:
+    """
+    Analyze competitor strategy, products, and market presence.
+
+    WHY: Provides comprehensive competitive intelligence for strategic planning.
+    HOW: Aggregates data from Crunchbase, SimilarWeb, and web scraping.
+    """
+    competitor_name = task.parameters["competitor_name"]
+    competitor_website = task.parameters.get("competitor_website")
+    analysis_depth = task.parameters.get("analysis_depth", "standard")
+    include_traffic = task.parameters.get("include_traffic_data", True)
+    include_funding = task.parameters.get("include_funding_data", True)
+
+    # Check cache first (24-hour TTL)
+    cache_key = f"competitor_{competitor_name.lower().replace(' ', '_')}"
+    if cache_key in self._research_cache:
+        cached_data, cached_time = self._research_cache[cache_key]
+        if datetime.now() - cached_time < self._cache_ttl:
+            cached_data["cached"] = True
+            return cached_data
+
+    # Guard clause: Validate at least one API client is configured
+    if not self._crunchbase_client and not self._similarweb_client:
+        return {
+            "error": "No research API clients configured",
+            "competitor_name": competitor_name
+        }
+
+    try:
+        result = {
+            "competitor_name": competitor_name,
+            "website": competitor_website,
+            "overview": {},
+            "products": [],
+            "positioning": {},
+            "analysis_timestamp": datetime.now().isoformat(),
+            "cached": False
+        }
+
+        # Fetch company overview from Crunchbase
+        if self._crunchbase_client and include_funding:
+            company_data = await self._crunchbase_client.get_organization(
+                name=competitor_name
+            )
+
+            result["overview"] = {
+                "description": company_data.get("short_description", ""),
+                "founded_year": company_data.get("founded_on", {}).get("year"),
+                "headquarters": company_data.get("location_identifiers", [{}])[0].get("value"),
+                "employee_count": company_data.get("num_employees_enum"),
+                "estimated_revenue": company_data.get("revenue_range")
+            }
+
+            result["funding"] = {
+                "total_funding": company_data.get("funding_total", {}).get("value_usd"),
+                "last_round": company_data.get("last_funding_type"),
+                "last_round_date": company_data.get("last_funding_at"),
+                "investors": [inv.get("name") for inv in company_data.get("investors", [])]
+            }
+
+        # Fetch traffic data from SimilarWeb
+        if self._similarweb_client and include_traffic and competitor_website:
+            traffic_data = await self._similarweb_client.get_website_traffic(
+                domain=competitor_website
+            )
+
+            result["traffic_metrics"] = {
+                "monthly_visits": traffic_data.get("visits", {}).get("2025-10-01"),
+                "traffic_sources": {
+                    "direct": traffic_data.get("traffic_sources", {}).get("Direct", 0),
+                    "search": traffic_data.get("traffic_sources", {}).get("Search", 0),
+                    "social": traffic_data.get("traffic_sources", {}).get("Social", 0),
+                    "referral": traffic_data.get("traffic_sources", {}).get("Referrals", 0)
+                },
+                "top_countries": traffic_data.get("geography", {}).get("countries", [])[:3],
+                "engagement_rate": traffic_data.get("engagement", {}).get("engagement_rate"),
+                "bounce_rate": traffic_data.get("engagement", {}).get("bounce_rate")
+            }
+
+        # Generate AI-powered positioning analysis
+        if analysis_depth in ["standard", "deep"]:
+            positioning = await self._analyze_positioning(
+                competitor_name=competitor_name,
+                company_data=result.get("overview", {}),
+                traffic_data=result.get("traffic_metrics", {})
+            )
+            result["positioning"] = positioning
+
+        # Cache result
+        self._research_cache[cache_key] = (result, datetime.now())
+
+        self.logger.info(
+            f"Competitor analysis completed: {competitor_name}",
+            extra={
+                "analysis_depth": analysis_depth,
+                "data_sources": self._count_configured_clients()
+            }
+        )
+
+        return result
+
+    except Exception as e:
+        raise AgentExecutionError(
+            agent_id=self.agent_id,
+            task_id=task.task_id,
+            message=f"Failed to analyze competitor: {str(e)}",
+            original_exception=e
+        )
+```
+
+#### Task Type 2: Identify Market Trends
+
+**Purpose:** Identify emerging market trends, search patterns, and industry dynamics.
+
+**Parameters:**
+- `topic` (str): Market topic or keyword to analyze
+- `timeframe` (str, optional): Analysis timeframe (past_7_days, past_30_days, past_90_days, past_year) - default: past_30_days
+- `geographic_region` (str, optional): Geographic focus (US, UK, worldwide) - default: US
+- `include_news` (bool, optional): Include news articles - default: True
+
+**Returns:**
+```python
+{
+    "topic": "AI Marketing Automation",
+    "timeframe": "past_30_days",
+    "geographic_region": "US",
+    "search_trends": {
+        "trend_direction": "rising",
+        "search_volume_change": "+25%",
+        "interest_over_time": [
+            {"date": "2025-10-01", "interest": 65},
+            {"date": "2025-10-08", "interest": 72},
+            {"date": "2025-10-15", "interest": 78},
+            {"date": "2025-10-22", "interest": 85},
+            {"date": "2025-10-29", "interest": 88}
+        ],
+        "peak_interest_date": "2025-10-29",
+        "average_interest": 77.6
+    },
+    "related_topics": [
+        {"topic": "Marketing AI Tools", "growth": "+45%", "relevance": 0.95},
+        {"topic": "Content Automation", "growth": "+30%", "relevance": 0.88},
+        {"topic": "Predictive Analytics", "growth": "+20%", "relevance": 0.82}
+    ],
+    "related_queries": [
+        {"query": "best AI marketing tools 2025", "growth": "+60%"},
+        {"query": "marketing automation platforms", "growth": "+35%"},
+        {"query": "AI content generation", "growth": "+50%"}
+    ],
+    "news_insights": [
+        {
+            "title": "AI Marketing Automation Market to Reach $8.4B by 2026",
+            "source": "TechCrunch",
+            "published_date": "2025-10-28",
+            "sentiment": "positive",
+            "relevance_score": 0.92
+        }
+    ],
+    "trend_summary": "AI Marketing Automation shows strong upward trend with 25% growth in search interest over the past 30 days. Related topics indicate growing interest in content automation and predictive analytics.",
+    "analysis_timestamp": "2025-11-03T10:00:00Z"
+}
+```
+
+**Implementation:**
+```python
+async def _identify_market_trends(self, task: Task) -> dict[str, Any]:
+    """
+    Identify emerging market trends using search and news data.
+
+    WHY: Helps identify market opportunities and strategic positioning.
+    HOW: Analyzes Google Trends data and news articles with AI summarization.
+    """
+    topic = task.parameters["topic"]
+    timeframe = task.parameters.get("timeframe", "past_30_days")
+    region = task.parameters.get("geographic_region", "US")
+    include_news = task.parameters.get("include_news", True)
+
+    # Check cache first
+    cache_key = f"trends_{topic.lower().replace(' ', '_')}_{timeframe}_{region}"
+    if cache_key in self._research_cache:
+        cached_data, cached_time = self._research_cache[cache_key]
+        if datetime.now() - cached_time < self._cache_ttl:
+            cached_data["cached"] = True
+            return cached_data
+
+    # Guard clause: Validate Google Trends client
+    if not self._google_trends_client:
+        return {"error": "Google Trends client not configured"}
+
+    try:
+        # Fetch Google Trends data
+        trends_data = await self._google_trends_client.get_interest_over_time(
+            keywords=[topic],
+            timeframe=timeframe,
+            geo=region
+        )
+
+        # Calculate trend direction and metrics
+        interest_values = [point["interest"] for point in trends_data.get("data", [])]
+        avg_interest = sum(interest_values) / len(interest_values) if interest_values else 0
+
+        first_half_avg = sum(interest_values[:len(interest_values)//2]) / (len(interest_values)//2) if interest_values else 0
+        second_half_avg = sum(interest_values[len(interest_values)//2:]) / (len(interest_values) - len(interest_values)//2) if interest_values else 0
+
+        trend_change = ((second_half_avg - first_half_avg) / first_half_avg * 100) if first_half_avg > 0 else 0
+        trend_direction = "rising" if trend_change > 5 else "falling" if trend_change < -5 else "stable"
+
+        result = {
+            "topic": topic,
+            "timeframe": timeframe,
+            "geographic_region": region,
+            "search_trends": {
+                "trend_direction": trend_direction,
+                "search_volume_change": f"{trend_change:+.1f}%",
+                "interest_over_time": trends_data.get("data", []),
+                "peak_interest_date": max(trends_data.get("data", []), key=lambda x: x["interest"])["date"] if trends_data.get("data") else None,
+                "average_interest": round(avg_interest, 1)
+            },
+            "analysis_timestamp": datetime.now().isoformat(),
+            "cached": False
+        }
+
+        # Fetch related topics and queries
+        related_data = await self._google_trends_client.get_related_topics(
+            keyword=topic,
+            timeframe=timeframe,
+            geo=region
+        )
+
+        result["related_topics"] = related_data.get("topics", [])[:10]
+        result["related_queries"] = related_data.get("queries", [])[:10]
+
+        # Fetch news insights if requested
+        if include_news and self._news_api_client:
+            news_articles = await self._news_api_client.search_articles(
+                query=topic,
+                from_date=(datetime.now() - timedelta(days=30)).isoformat(),
+                language="en",
+                sort_by="relevancy"
+            )
+
+            result["news_insights"] = [
+                {
+                    "title": article.get("title"),
+                    "source": article.get("source", {}).get("name"),
+                    "published_date": article.get("publishedAt"),
+                    "sentiment": await self._analyze_article_sentiment(article.get("description", "")),
+                    "relevance_score": 0.85  # Simplified - would use semantic similarity in production
+                }
+                for article in news_articles.get("articles", [])[:5]
+            ]
+
+        # Generate AI-powered summary
+        trend_summary = await self._generate_trend_summary(result)
+        result["trend_summary"] = trend_summary
+
+        # Cache result
+        self._research_cache[cache_key] = (result, datetime.now())
+
+        self.logger.info(
+            f"Market trends identified: {topic}",
+            extra={
+                "trend_direction": trend_direction,
+                "related_topics_count": len(result.get("related_topics", []))
+            }
+        )
+
+        return result
+
+    except Exception as e:
+        raise AgentExecutionError(
+            agent_id=self.agent_id,
+            task_id=task.task_id,
+            message=f"Failed to identify market trends: {str(e)}",
+            original_exception=e
+        )
+```
+
+#### Task Type 3: Analyze Sentiment
+
+**Purpose:** Analyze customer sentiment from reviews, social media, and feedback.
+
+**Parameters:**
+- `source` (str): Data source (reviews, social_media, news, custom)
+- `query` (str): Search query or product/company name
+- `timeframe` (str, optional): Analysis timeframe - default: past_30_days
+- `platforms` (list[str], optional): Platforms to analyze (twitter, reddit, trustpilot)
+
+**Returns:**
+```python
+{
+    "source": "reviews",
+    "query": "AI Marketing Platform",
+    "timeframe": "past_30_days",
+    "overall_sentiment": {
+        "score": 7.8,
+        "distribution": {
+            "positive": 65.5,
+            "neutral": 25.0,
+            "negative": 9.5
+        },
+        "confidence": 0.87
+    },
+    "sentiment_by_topic": {
+        "ease_of_use": {"score": 8.2, "sentiment": "positive"},
+        "customer_support": {"score": 7.5, "sentiment": "positive"},
+        "pricing": {"score": 6.8, "sentiment": "mixed"},
+        "features": {"score": 8.5, "sentiment": "positive"},
+        "integration": {"score": 7.0, "sentiment": "mixed"}
+    },
+    "key_themes": [
+        {
+            "theme": "AI capabilities",
+            "mentions": 145,
+            "sentiment": "positive",
+            "sample_quotes": ["Great AI features", "Impressive automation"]
+        },
+        {
+            "theme": "Pricing concerns",
+            "mentions": 67,
+            "sentiment": "negative",
+            "sample_quotes": ["Too expensive for small teams", "Pricing tier confusion"]
+        }
+    ],
+    "trend_over_time": [
+        {"date": "2025-10-01", "sentiment_score": 7.5},
+        {"date": "2025-10-08", "sentiment_score": 7.7},
+        {"date": "2025-10-15", "sentiment_score": 7.9},
+        {"date": "2025-10-22", "sentiment_score": 7.8},
+        {"date": "2025-10-29", "sentiment_score": 7.8}
+    ],
+    "sample_size": 342,
+    "analysis_timestamp": "2025-11-03T10:00:00Z"
+}
+```
+
+**Implementation:**
+```python
+async def _analyze_sentiment(self, task: Task) -> dict[str, Any]:
+    """
+    Analyze customer sentiment from various sources.
+
+    WHY: Provides insights into customer perception and satisfaction.
+    HOW: Aggregates reviews/social data and applies NLP sentiment analysis.
+    """
+    source = task.parameters["source"]
+    query = task.parameters.get("query", "")
+    timeframe = task.parameters.get("timeframe", "past_30_days")
+    platforms = task.parameters.get("platforms", ["twitter", "reddit"])
+
+    # Guard clause: Validate source is supported
+    supported_sources = ["reviews", "social_media", "news", "custom"]
+    if source not in supported_sources:
+        return {"error": f"Unsupported source: {source}"}
+
+    try:
+        # Collect data based on source
+        sentiment_data = []
+
+        if source == "social_media":
+            # Fetch social media posts (simplified - would use Twitter/Reddit APIs)
+            sentiment_data = await self._fetch_social_media_data(
+                query=query,
+                platforms=platforms,
+                timeframe=timeframe
+            )
+        elif source == "reviews":
+            # Fetch product reviews (simplified - would use review platform APIs)
+            sentiment_data = await self._fetch_review_data(
+                query=query,
+                timeframe=timeframe
+            )
+        elif source == "news":
+            # Use News API
+            if self._news_api_client:
+                articles = await self._news_api_client.search_articles(
+                    query=query,
+                    from_date=(datetime.now() - timedelta(days=30)).isoformat()
+                )
+                sentiment_data = [
+                    {"text": article.get("description", ""), "date": article.get("publishedAt")}
+                    for article in articles.get("articles", [])
+                ]
+
+        # Guard clause: Check if data was collected
+        if not sentiment_data:
+            return {
+                "error": "No data collected for sentiment analysis",
+                "source": source,
+                "query": query
+            }
+
+        # Analyze sentiment using AI
+        sentiments = []
+        for item in sentiment_data:
+            sentiment_score = await self._calculate_sentiment_score(item["text"])
+            sentiments.append({
+                "score": sentiment_score,
+                "text": item["text"],
+                "date": item.get("date")
+            })
+
+        # Calculate aggregate metrics
+        avg_score = sum(s["score"] for s in sentiments) / len(sentiments)
+        positive_count = sum(1 for s in sentiments if s["score"] >= 7)
+        neutral_count = sum(1 for s in sentiments if 4 <= s["score"] < 7)
+        negative_count = sum(1 for s in sentiments if s["score"] < 4)
+
+        result = {
+            "source": source,
+            "query": query,
+            "timeframe": timeframe,
+            "overall_sentiment": {
+                "score": round(avg_score, 1),
+                "distribution": {
+                    "positive": round((positive_count / len(sentiments)) * 100, 1),
+                    "neutral": round((neutral_count / len(sentiments)) * 100, 1),
+                    "negative": round((negative_count / len(sentiments)) * 100, 1)
+                },
+                "confidence": 0.87
+            },
+            "sample_size": len(sentiments),
+            "analysis_timestamp": datetime.now().isoformat()
+        }
+
+        # Extract key themes using topic modeling
+        themes = await self._extract_sentiment_themes(sentiments)
+        result["key_themes"] = themes
+
+        self.logger.info(
+            f"Sentiment analysis completed: {query}",
+            extra={
+                "source": source,
+                "sample_size": len(sentiments),
+                "avg_sentiment": avg_score
+            }
+        )
+
+        return result
+
+    except Exception as e:
+        raise AgentExecutionError(
+            agent_id=self.agent_id,
+            task_id=task.task_id,
+            message=f"Failed to analyze sentiment: {str(e)}",
+            original_exception=e
+        )
+```
+
+#### Task Type 4: Research Industry
+
+**Purpose:** Research industry dynamics, market size, growth rates, and key players.
+
+**Parameters:**
+- `industry` (str): Industry to research (e.g., "Marketing Automation", "SaaS")
+- `include_market_size` (bool, optional): Include market size data - default: True
+- `include_competitors` (bool, optional): Include competitor list - default: True
+- `include_trends` (bool, optional): Include industry trends - default: True
+
+**Returns:**
+```python
+{
+    "industry": "Marketing Automation",
+    "market_overview": {
+        "market_size_usd": "7.63B",
+        "market_size_year": 2025,
+        "projected_size_2030": "13.71B",
+        "cagr_2025_2030": "12.4%",
+        "growth_stage": "rapid_growth"
+    },
+    "key_segments": [
+        {
+            "segment": "Email Marketing",
+            "market_share": "32%",
+            "growth_rate": "10.5%"
+        },
+        {
+            "segment": "Social Media Marketing",
+            "market_share": "28%",
+            "growth_rate": "15.2%"
+        },
+        {
+            "segment": "Lead Management",
+            "market_share": "25%",
+            "growth_rate": "11.8%"
+        }
+    ],
+    "top_competitors": [
+        {
+            "name": "HubSpot",
+            "market_share": "18%",
+            "revenue": "$1.7B",
+            "position": "market_leader"
+        },
+        {
+            "name": "Salesforce Marketing Cloud",
+            "market_share": "15%",
+            "revenue": "$1.2B",
+            "position": "strong_contender"
+        }
+    ],
+    "industry_trends": [
+        {
+            "trend": "AI-powered personalization",
+            "adoption_rate": "68%",
+            "growth_trajectory": "accelerating"
+        },
+        {
+            "trend": "Multi-channel orchestration",
+            "adoption_rate": "54%",
+            "growth_trajectory": "steady"
+        }
+    ],
+    "market_drivers": [
+        "Increasing digital marketing spend",
+        "Need for personalization at scale",
+        "Rise of AI and ML technologies"
+    ],
+    "market_challenges": [
+        "Data privacy regulations",
+        "Integration complexity",
+        "Skills shortage"
+    ],
+    "analysis_timestamp": "2025-11-03T10:00:00Z"
+}
+```
+
+**Implementation:**
+```python
+async def _research_industry(self, task: Task) -> dict[str, Any]:
+    """
+    Research industry dynamics, market size, and competitive landscape.
+
+    WHY: Provides strategic context for market positioning and opportunity assessment.
+    HOW: Aggregates data from multiple sources and applies market analysis frameworks.
+    """
+    industry = task.parameters["industry"]
+    include_market_size = task.parameters.get("include_market_size", True)
+    include_competitors = task.parameters.get("include_competitors", True)
+    include_trends = task.parameters.get("include_trends", True)
+
+    # Check cache first
+    cache_key = f"industry_{industry.lower().replace(' ', '_')}"
+    if cache_key in self._research_cache:
+        cached_data, cached_time = self._research_cache[cache_key]
+        if datetime.now() - cached_time < self._cache_ttl:
+            cached_data["cached"] = True
+            return cached_data
+
+    try:
+        result = {
+            "industry": industry,
+            "analysis_timestamp": datetime.now().isoformat(),
+            "cached": False
+        }
+
+        # Research market size and projections
+        if include_market_size:
+            market_data = await self._research_market_size(industry)
+            result["market_overview"] = market_data
+
+        # Identify top competitors
+        if include_competitors and self._crunchbase_client:
+            competitors = await self._crunchbase_client.search_organizations(
+                query=industry,
+                categories=[industry.lower()],
+                sort_by="funding_total",
+                limit=10
+            )
+
+            result["top_competitors"] = [
+                {
+                    "name": comp.get("name"),
+                    "market_share": "Unknown",  # Would need additional data source
+                    "revenue": comp.get("revenue_range"),
+                    "position": self._classify_market_position(comp)
+                }
+                for comp in competitors.get("entities", [])
+            ]
+
+        # Identify industry trends
+        if include_trends:
+            trends = await self._identify_industry_trends(industry)
+            result["industry_trends"] = trends
+
+        # Analyze market drivers and challenges
+        market_dynamics = await self._analyze_market_dynamics(industry)
+        result["market_drivers"] = market_dynamics["drivers"]
+        result["market_challenges"] = market_dynamics["challenges"]
+
+        # Cache result
+        self._research_cache[cache_key] = (result, datetime.now())
+
+        self.logger.info(
+            f"Industry research completed: {industry}",
+            extra={"competitors_found": len(result.get("top_competitors", []))}
+        )
+
+        return result
+
+    except Exception as e:
+        raise AgentExecutionError(
+            agent_id=self.agent_id,
+            task_id=task.task_id,
+            message=f"Failed to research industry: {str(e)}",
+            original_exception=e
+        )
+```
+
+#### Task Type 5: Perform SWOT Analysis
+
+**Purpose:** Generate strategic SWOT (Strengths, Weaknesses, Opportunities, Threats) analysis.
+
+**Parameters:**
+- `company_name` (str): Company to analyze
+- `include_competitor_comparison` (bool, optional): Compare against competitors - default: True
+- `focus_areas` (list[str], optional): Specific areas to focus on
+
+**Returns:**
+```python
+{
+    "company_name": "Our Company",
+    "swot_analysis": {
+        "strengths": [
+            {
+                "strength": "Advanced AI technology",
+                "impact": "high",
+                "evidence": "Patent portfolio, customer testimonials"
+            },
+            {
+                "strength": "Strong enterprise customer base",
+                "impact": "high",
+                "evidence": "60% of Fortune 500 customers"
+            }
+        ],
+        "weaknesses": [
+            {
+                "weakness": "Limited SMB market presence",
+                "impact": "medium",
+                "mitigation": "Launch SMB-focused product tier"
+            },
+            {
+                "weakness": "Higher pricing than competitors",
+                "impact": "medium",
+                "mitigation": "Emphasize ROI and value proposition"
+            }
+        ],
+        "opportunities": [
+            {
+                "opportunity": "Growing AI automation market",
+                "potential_impact": "very_high",
+                "timeframe": "6-12 months",
+                "requirements": "Product enhancement, market education"
+            },
+            {
+                "opportunity": "International expansion",
+                "potential_impact": "high",
+                "timeframe": "12-18 months",
+                "requirements": "Localization, regional partnerships"
+            }
+        ],
+        "threats": [
+            {
+                "threat": "Well-funded new entrants",
+                "severity": "medium",
+                "mitigation_strategy": "Accelerate innovation, strengthen customer relationships"
+            },
+            {
+                "threat": "Economic downturn reducing marketing budgets",
+                "severity": "medium",
+                "mitigation_strategy": "Demonstrate clear ROI, flexible pricing"
+            }
+        ]
+    },
+    "competitive_positioning": {
+        "market_position": "strong_contender",
+        "key_differentiators": ["AI technology", "Enterprise features"],
+        "competitive_advantages": ["Technology innovation", "Customer success"]
+    },
+    "strategic_recommendations": [
+        "Expand into SMB market with new product tier",
+        "Accelerate AI feature development",
+        "Build strategic partnerships for international expansion"
+    ],
+    "analysis_timestamp": "2025-11-03T10:00:00Z"
+}
+```
+
+**Implementation:**
+```python
+async def _perform_swot_analysis(self, task: Task) -> dict[str, Any]:
+    """
+    Perform strategic SWOT analysis.
+
+    WHY: Provides comprehensive strategic assessment for planning.
+    HOW: Combines market research, competitor analysis, and AI-powered insights.
+    """
+    company_name = task.parameters["company_name"]
+    include_competitor_comparison = task.parameters.get("include_competitor_comparison", True)
+    focus_areas = task.parameters.get("focus_areas", [])
+
+    try:
+        # Gather company data
+        company_data = {}
+        if self._crunchbase_client:
+            company_data = await self._crunchbase_client.get_organization(name=company_name)
+
+        # Analyze competitors for context
+        competitor_insights = []
+        if include_competitor_comparison:
+            competitor_insights = await self._get_competitor_insights(company_name)
+
+        # Generate SWOT using AI analysis
+        swot = await self._generate_swot_analysis(
+            company_name=company_name,
+            company_data=company_data,
+            competitor_insights=competitor_insights,
+            focus_areas=focus_areas
+        )
+
+        result = {
+            "company_name": company_name,
+            "swot_analysis": swot,
+            "analysis_timestamp": datetime.now().isoformat()
+        }
+
+        # Generate strategic recommendations
+        recommendations = await self._generate_strategic_recommendations(swot)
+        result["strategic_recommendations"] = recommendations
+
+        self.logger.info(
+            f"SWOT analysis completed: {company_name}",
+            extra={
+                "strengths_count": len(swot.get("strengths", [])),
+                "opportunities_count": len(swot.get("opportunities", []))
+            }
+        )
+
+        return result
+
+    except Exception as e:
+        raise AgentExecutionError(
+            agent_id=self.agent_id,
+            task_id=task.task_id,
+            message=f"Failed to perform SWOT analysis: {str(e)}",
+            original_exception=e
+        )
+```
+
+#### Task Type 6: Track Competitor Activity
+
+**Purpose:** Monitor and track competitor activities, announcements, and changes.
+
+**Parameters:**
+- `competitor_name` (str): Competitor to track
+- `activity_types` (list[str], optional): Types to track (product_launches, funding, news, social)
+- `lookback_days` (int, optional): Days to look back - default: 7
+
+**Returns:**
+```python
+{
+    "competitor_name": "Competitor Inc",
+    "tracking_period": {
+        "start_date": "2025-10-27",
+        "end_date": "2025-11-03"
+    },
+    "activities": [
+        {
+            "activity_type": "product_launch",
+            "title": "New AI-Powered Analytics Feature",
+            "date": "2025-11-01",
+            "description": "Launched predictive analytics module",
+            "impact_assessment": "medium",
+            "strategic_implications": "Increases competitive pressure in analytics space"
+        },
+        {
+            "activity_type": "funding",
+            "title": "Series C Funding Round",
+            "date": "2025-10-30",
+            "description": "Raised $50M Series C led by Accel",
+            "impact_assessment": "high",
+            "strategic_implications": "Increased resources for product development and market expansion"
+        }
+    ],
+    "activity_summary": {
+        "total_activities": 5,
+        "by_type": {
+            "product_launches": 2,
+            "funding": 1,
+            "news": 1,
+            "social": 1
+        },
+        "activity_level": "high"
+    },
+    "analysis_timestamp": "2025-11-03T10:00:00Z"
+}
+```
+
+**Implementation:**
+```python
+async def _track_competitor_activity(self, task: Task) -> dict[str, Any]:
+    """
+    Track competitor activities and changes.
+
+    WHY: Enables proactive response to competitive moves.
+    HOW: Monitors news, product updates, and company announcements.
+    """
+    competitor_name = task.parameters["competitor_name"]
+    activity_types = task.parameters.get("activity_types", ["product_launches", "funding", "news"])
+    lookback_days = task.parameters.get("lookback_days", 7)
+
+    start_date = datetime.now() - timedelta(days=lookback_days)
+
+    try:
+        activities = []
+
+        # Track funding activities
+        if "funding" in activity_types and self._crunchbase_client:
+            funding_data = await self._crunchbase_client.get_organization(
+                name=competitor_name
+            )
+
+            last_funding = funding_data.get("last_funding_at")
+            if last_funding and datetime.fromisoformat(last_funding) >= start_date:
+                activities.append({
+                    "activity_type": "funding",
+                    "title": f"{funding_data.get('last_funding_type')} Funding Round",
+                    "date": last_funding,
+                    "description": f"Raised {funding_data.get('funding_total', {}).get('value_usd')}",
+                    "impact_assessment": "high",
+                    "strategic_implications": "Increased resources for expansion"
+                })
+
+        # Track news and announcements
+        if "news" in activity_types and self._news_api_client:
+            news = await self._news_api_client.search_articles(
+                query=competitor_name,
+                from_date=start_date.isoformat(),
+                sort_by="publishedAt"
+            )
+
+            for article in news.get("articles", [])[:5]:
+                activities.append({
+                    "activity_type": "news",
+                    "title": article.get("title"),
+                    "date": article.get("publishedAt"),
+                    "description": article.get("description"),
+                    "impact_assessment": "medium",
+                    "strategic_implications": await self._assess_competitive_impact(article.get("description", ""))
+                })
+
+        # Calculate activity summary
+        activity_summary = {
+            "total_activities": len(activities),
+            "by_type": {},
+            "activity_level": "high" if len(activities) > 3 else "medium" if len(activities) > 1 else "low"
+        }
+
+        for activity in activities:
+            activity_type = activity["activity_type"]
+            activity_summary["by_type"][activity_type] = activity_summary["by_type"].get(activity_type, 0) + 1
+
+        result = {
+            "competitor_name": competitor_name,
+            "tracking_period": {
+                "start_date": start_date.date().isoformat(),
+                "end_date": datetime.now().date().isoformat()
+            },
+            "activities": activities,
+            "activity_summary": activity_summary,
+            "analysis_timestamp": datetime.now().isoformat()
+        }
+
+        # Update tracking state
+        self._tracked_competitors[competitor_name] = result
+
+        self.logger.info(
+            f"Competitor activity tracked: {competitor_name}",
+            extra={
+                "activities_found": len(activities),
+                "lookback_days": lookback_days
+            }
+        )
+
+        return result
+
+    except Exception as e:
+        raise AgentExecutionError(
+            agent_id=self.agent_id,
+            task_id=task.task_id,
+            message=f"Failed to track competitor activity: {str(e)}",
+            original_exception=e
+        )
+```
+
+#### Task Type 7: Identify Opportunities
+
+**Purpose:** Identify market gaps, opportunities, and underserved segments.
+
+**Parameters:**
+- `market_segment` (str): Market segment to analyze
+- `analysis_type` (str, optional): Type of analysis (gap_analysis, whitespace, emerging_needs)
+- `include_sizing` (bool, optional): Include opportunity sizing - default: True
+
+**Returns:**
+```python
+{
+    "market_segment": "SMB Marketing Automation",
+    "analysis_type": "gap_analysis",
+    "opportunities": [
+        {
+            "opportunity_id": "opp_001",
+            "title": "Affordable AI-powered automation for SMBs",
+            "description": "SMBs need automation but current solutions are priced for enterprise",
+            "market_gap": "Price-accessible AI automation tools",
+            "target_segment": "SMBs with 10-50 employees",
+            "estimated_tam": "$2.3B",
+            "addressable_market_size": "450,000 companies",
+            "competition_level": "low",
+            "barriers_to_entry": "Product development, market education",
+            "time_to_market": "6-9 months",
+            "priority": "high"
+        },
+        {
+            "opportunity_id": "opp_002",
+            "title": "Industry-specific marketing templates",
+            "description": "Generic templates don't address industry-specific needs",
+            "market_gap": "Pre-built industry vertical solutions",
+            "target_segment": "Healthcare, Legal, Real Estate SMBs",
+            "estimated_tam": "$800M",
+            "addressable_market_size": "120,000 companies",
+            "competition_level": "medium",
+            "barriers_to_entry": "Industry expertise, compliance knowledge",
+            "time_to_market": "3-6 months",
+            "priority": "medium"
+        }
+    ],
+    "opportunity_summary": {
+        "total_opportunities": 2,
+        "high_priority": 1,
+        "total_tam": "$3.1B",
+        "recommended_focus": "opp_001"
+    },
+    "analysis_timestamp": "2025-11-03T10:00:00Z"
+}
+```
+
+**Implementation:**
+```python
+async def _identify_opportunities(self, task: Task) -> dict[str, Any]:
+    """
+    Identify market opportunities and gaps.
+
+    WHY: Guides strategic product and market expansion decisions.
+    HOW: Analyzes market data, competitor gaps, and emerging needs.
+    """
+    market_segment = task.parameters["market_segment"]
+    analysis_type = task.parameters.get("analysis_type", "gap_analysis")
+    include_sizing = task.parameters.get("include_sizing", True)
+
+    try:
+        # Analyze market landscape
+        market_research = await self._research_industry(
+            task=Task(
+                task_id="temp_research",
+                task_type="research_industry",
+                parameters={"industry": market_segment}
+            )
+        )
+
+        # Analyze competitors to identify gaps
+        competitor_analysis = await self._analyze_competitor_gaps(market_segment)
+
+        # Identify customer pain points and unmet needs
+        customer_needs = await self._identify_unmet_needs(market_segment)
+
+        # Generate opportunities using AI analysis
+        opportunities = await self._generate_opportunities(
+            market_data=market_research,
+            competitor_gaps=competitor_analysis,
+            customer_needs=customer_needs,
+            analysis_type=analysis_type
+        )
+
+        # Size opportunities if requested
+        if include_sizing:
+            for opp in opportunities:
+                sizing = await self._size_opportunity(opp)
+                opp.update(sizing)
+
+        # Prioritize opportunities
+        prioritized_opportunities = sorted(
+            opportunities,
+            key=lambda x: (
+                {"high": 3, "medium": 2, "low": 1}.get(x.get("priority", "low"), 0)
+            ),
+            reverse=True
+        )
+
+        result = {
+            "market_segment": market_segment,
+            "analysis_type": analysis_type,
+            "opportunities": prioritized_opportunities,
+            "opportunity_summary": {
+                "total_opportunities": len(opportunities),
+                "high_priority": sum(1 for o in opportunities if o.get("priority") == "high"),
+                "recommended_focus": prioritized_opportunities[0].get("opportunity_id") if prioritized_opportunities else None
+            },
+            "analysis_timestamp": datetime.now().isoformat()
+        }
+
+        self.logger.info(
+            f"Market opportunities identified: {market_segment}",
+            extra={
+                "opportunities_found": len(opportunities),
+                "high_priority_count": result["opportunity_summary"]["high_priority"]
+            }
+        )
+
+        return result
+
+    except Exception as e:
+        raise AgentExecutionError(
+            agent_id=self.agent_id,
+            task_id=task.task_id,
+            message=f"Failed to identify opportunities: {str(e)}",
+            original_exception=e
+        )
+```
+
+#### Task Type 8: Generate Market Insights
+
+**Purpose:** Generate AI-powered insights and strategic recommendations from research data.
+
+**Parameters:**
+- `data_sources` (list[str]): Data sources to analyze (competitor_data, trend_data, sentiment_data)
+- `insight_focus` (str, optional): Focus area (positioning, messaging, product, pricing)
+- `include_recommendations` (bool, optional): Include actionable recommendations - default: True
+
+**Returns:**
+```python
+{
+    "data_sources": ["competitor_data", "trend_data", "sentiment_data"],
+    "insight_focus": "positioning",
+    "insights": [
+        {
+            "insight_id": "insight_001",
+            "category": "competitive_positioning",
+            "insight": "Competitors focus on feature breadth, creating opportunity for depth-first positioning",
+            "confidence": 0.85,
+            "supporting_data": [
+                "Competitor A offers 50+ features with shallow implementation",
+                "Customer reviews indicate preference for fewer, better-executed features"
+            ],
+            "strategic_implication": "Position as 'best-in-class' for core use cases rather than feature parity"
+        },
+        {
+            "insight_id": "insight_002",
+            "category": "market_trends",
+            "insight": "AI automation interest growing 25% faster in SMB segment than enterprise",
+            "confidence": 0.92,
+            "supporting_data": [
+                "Google Trends shows 45% growth in SMB-related AI searches",
+                "Competitor funding focused on enterprise, leaving SMB underserved"
+            ],
+            "strategic_implication": "SMB market presents higher growth opportunity with less competition"
+        }
+    ],
+    "recommendations": [
+        {
+            "recommendation": "Develop SMB-focused product tier",
+            "priority": "high",
+            "expected_impact": "Market share growth in high-growth segment",
+            "implementation_complexity": "medium",
+            "timeframe": "3-6 months"
+        },
+        {
+            "recommendation": "Shift messaging from feature parity to outcome-focused positioning",
+            "priority": "high",
+            "expected_impact": "Improved differentiation and conversion rates",
+            "implementation_complexity": "low",
+            "timeframe": "1-2 months"
+        }
+    ],
+    "insight_summary": "Analysis reveals opportunity to differentiate through depth-first positioning targeting the underserved SMB segment, which shows 25% higher growth than enterprise market.",
+    "analysis_timestamp": "2025-11-03T10:00:00Z"
+}
+```
+
+**Implementation:**
+```python
+async def _generate_market_insights(self, task: Task) -> dict[str, Any]:
+    """
+    Generate AI-powered market insights from research data.
+
+    WHY: Transforms raw research into actionable strategic intelligence.
+    HOW: Applies AI analysis to synthesize patterns and recommendations.
+    """
+    data_sources = task.parameters["data_sources"]
+    insight_focus = task.parameters.get("insight_focus", "general")
+    include_recommendations = task.parameters.get("include_recommendations", True)
+
+    # Guard clause: Validate data sources
+    if not data_sources:
+        return {"error": "No data sources provided"}
+
+    try:
+        # Gather data from specified sources
+        research_data = {}
+
+        for source in data_sources:
+            if source == "competitor_data" and self._tracked_competitors:
+                research_data["competitors"] = self._tracked_competitors
+            elif source == "trend_data":
+                # Use cached trend data
+                trend_cache = {k: v[0] for k, v in self._research_cache.items() if k.startswith("trends_")}
+                research_data["trends"] = trend_cache
+            elif source == "sentiment_data":
+                # Use cached sentiment data
+                sentiment_cache = {k: v[0] for k, v in self._research_cache.items() if k.startswith("sentiment_")}
+                research_data["sentiment"] = sentiment_cache
+
+        # Guard clause: Check if data was collected
+        if not research_data:
+            return {"error": "No research data available from specified sources"}
+
+        # Generate insights using AI
+        insights = await self._analyze_research_data(
+            research_data=research_data,
+            focus_area=insight_focus
+        )
+
+        result = {
+            "data_sources": data_sources,
+            "insight_focus": insight_focus,
+            "insights": insights,
+            "analysis_timestamp": datetime.now().isoformat()
+        }
+
+        # Generate recommendations if requested
+        if include_recommendations:
+            recommendations = await self._generate_recommendations_from_insights(insights)
+            result["recommendations"] = recommendations
+
+        # Generate executive summary
+        summary = await self._generate_insight_summary(insights)
+        result["insight_summary"] = summary
+
+        self.logger.info(
+            f"Market insights generated",
+            extra={
+                "data_sources": len(data_sources),
+                "insights_generated": len(insights)
+            }
+        )
+
+        return result
+
+    except Exception as e:
+        raise AgentExecutionError(
+            agent_id=self.agent_id,
+            task_id=task.task_id,
+            message=f"Failed to generate market insights: {str(e)}",
+            original_exception=e
+        )
+```
+
+#### State Management
+
+The Market Research Agent maintains several types of state:
+
+1. **Research Cache:** Market research data cached with 24-hour TTL to reduce API calls
+2. **Competitor Tracking State:** Ongoing tracking data for monitored competitors
+3. **API Clients:** Connections to research APIs (Crunchbase, SimilarWeb, News API)
+
+```python
+# Example state structure
+{
+    "_research_cache": {
+        "competitor_acme_corp": (
+            {"competitor_name": "Acme Corp", "traffic_metrics": {...}, ...},
+            datetime(2025, 11, 3, 10, 0, 0)
+        ),
+        "trends_ai_marketing_past_30_days_US": (
+            {"topic": "AI Marketing", "search_trends": {...}, ...},
+            datetime(2025, 11, 3, 9, 0, 0)
+        )
+    },
+    "_tracked_competitors": {
+        "Competitor Inc": {
+            "activities": [...],
+            "last_updated": "2025-11-03T10:00:00Z"
+        }
+    },
+    "_crunchbase_client": CrunchbaseClient(...),
+    "_similarweb_client": SimilarWebClient(...),
+    "_news_api_client": NewsAPIClient(...)
+}
+```
+
+#### Coordination Examples
+
+**Example 1: CMO requests competitive analysis for strategy session**
+```python
+# CMO requests competitor analysis
+cmo -> market_research.analyze_competitor(
+    competitor_name="Competitor Inc",
+    analysis_depth="deep",
+    include_traffic_data=True,
+    include_funding_data=True
+)
+
+# Market Research Agent analyzes competitor
+market_research -> Crunchbase API -> Fetches company data
+market_research -> SimilarWeb API -> Fetches traffic data
+market_research -> {
+    "competitor_name": "Competitor Inc",
+    "overview": {...},
+    "traffic_metrics": {...},
+    "funding": {...},
+    "positioning": {...}
+}
+
+# CMO uses insights for strategic planning
+```
+
+**Example 2: Campaign Manager needs market trends for campaign planning**
+```python
+# Campaign Manager requests trend analysis
+campaign_manager -> market_research.identify_market_trends(
+    topic="AI Marketing Automation",
+    timeframe="past_90_days",
+    include_news=True
+)
+
+# Market Research Agent identifies trends
+market_research -> Google Trends API -> Fetches search data
+market_research -> News API -> Fetches related articles
+market_research -> {
+    "topic": "AI Marketing Automation",
+    "search_trends": {"trend_direction": "rising", ...},
+    "related_topics": [...],
+    "news_insights": [...]
+}
+
+# Campaign Manager uses trends to inform campaign messaging
+```
+
+**Example 3: Content Manager requests sentiment analysis for content strategy**
+```python
+# Content Manager needs customer sentiment data
+content_manager -> market_research.analyze_sentiment(
+    source="reviews",
+    query="Our Product",
+    timeframe="past_30_days"
+)
+
+# Market Research Agent analyzes sentiment
+market_research -> Reviews API -> Fetches customer reviews
+market_research -> AI Analysis -> Analyzes sentiment and themes
+market_research -> {
+    "overall_sentiment": {"score": 7.8, ...},
+    "sentiment_by_topic": {...},
+    "key_themes": [
+        {"theme": "AI capabilities", "sentiment": "positive"},
+        {"theme": "Pricing concerns", "sentiment": "negative"}
+    ]
+}
+
+# Content Manager adjusts content strategy to address concerns
+```
+
+**Example 4: CMO requests opportunity identification**
+```python
+# CMO wants to identify new market opportunities
+cmo -> market_research.identify_opportunities(
+    market_segment="SMB Marketing Automation",
+    analysis_type="gap_analysis",
+    include_sizing=True
+)
+
+# Market Research Agent conducts comprehensive analysis
+market_research -> research_industry(...) -> Industry data
+market_research -> analyze_competitor_gaps(...) -> Competitor gaps
+market_research -> AI Analysis -> Identifies opportunities
+market_research -> {
+    "opportunities": [
+        {
+            "title": "Affordable AI-powered automation for SMBs",
+            "estimated_tam": "$2.3B",
+            "priority": "high"
+        }
+    ]
+}
+
+# CMO uses opportunities for strategic planning and product roadmap
+```
+
+#### Architecture Compliance
+
+The Market Research Agent follows all architecture standards:
+
+**Strategy Pattern (Zero if/elif chains):**
+```python
+# ✅ CORRECT: Strategy Pattern with dictionary dispatch
+self._task_handlers = {
+    "analyze_competitor": self._analyze_competitor,
+    "identify_market_trends": self._identify_market_trends,
+    "analyze_sentiment": self._analyze_sentiment,
+    "research_industry": self._research_industry,
+    "perform_swot_analysis": self._perform_swot_analysis,
+    "track_competitor_activity": self._track_competitor_activity,
+    "identify_opportunities": self._identify_opportunities,
+    "generate_market_insights": self._generate_market_insights,
+}
+
+handler = self._task_handlers.get(task.task_type)
+result = await handler(task)
+
+# ❌ WRONG: if/elif chains
+if task.task_type == "analyze_competitor":
+    result = await self._analyze_competitor(task)
+elif task.task_type == "identify_market_trends":
+    result = await self._identify_market_trends(task)
+# ... more elif statements
+```
+
+**Guard Clauses (No nested ifs):**
+```python
+# ✅ CORRECT: Guard clauses with early returns
+async def _analyze_competitor(self, task: Task) -> dict[str, Any]:
+    competitor_name = task.parameters["competitor_name"]
+
+    # Guard clause: Validate API clients
+    if not self._crunchbase_client and not self._similarweb_client:
+        return {"error": "No research API clients configured"}
+
+    # Guard clause: Check cache
+    cache_key = f"competitor_{competitor_name.lower().replace(' ', '_')}"
+    if cache_key in self._research_cache:
+        cached_data, cached_time = self._research_cache[cache_key]
+        if datetime.now() - cached_time < self._cache_ttl:
+            return cached_data
+
+    # Main logic
+    result = await self._fetch_competitor_data(competitor_name)
+    return result
+
+# ❌ WRONG: Nested if statements
+async def _analyze_competitor(self, task: Task) -> dict[str, Any]:
+    if self._crunchbase_client or self._similarweb_client:
+        if cache_key not in self._research_cache:
+            result = await self._fetch_competitor_data(competitor_name)
+            return result
+```
+
+**Exception Wrapping:**
+```python
+# ✅ CORRECT: Wrap external API calls with AgentExecutionError
+try:
+    trends_data = await self._google_trends_client.get_interest_over_time(...)
+    return {"search_trends": trends_data}
+except Exception as e:
+    raise AgentExecutionError(
+        agent_id=self.agent_id,
+        task_id=task.task_id,
+        message=f"Failed to identify market trends: {str(e)}",
+        original_exception=e
+    )
+
+# ❌ WRONG: Let exceptions propagate
+trends_data = await self._google_trends_client.get_interest_over_time(...)
+```
+
+---
+
 ## 5. Data Models
 
 ### 5.1 Core Entities
