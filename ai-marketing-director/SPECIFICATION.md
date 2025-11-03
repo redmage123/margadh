@@ -4025,6 +4025,822 @@ image = await self._dalle_client.generate(prompt=prompt, size=size)
 
 ---
 
+### 4.10 Email Specialist Agent (Specialist Layer)
+
+The **Email Specialist Agent** is a specialist-layer agent providing email marketing capabilities including campaign creation, delivery, A/B testing, list segmentation, performance tracking, and automation workflows.
+
+**Agent Role:** `AgentRole.EMAIL_SPECIALIST`
+
+**Supervised By:** Campaign Manager, Content Manager
+
+**Coordinates With:** Copywriter Specialist (email copy), Designer Specialist (email headers/templates), Analytics Specialist (performance data)
+
+**External Integrations:** SendGrid API, Mailchimp API, HubSpot Email API
+
+#### Architecture
+
+```python
+class EmailSpecialistAgent(BaseAgent):
+    """
+    Specialist-layer agent for email marketing and automation.
+
+    WHY: Provides specialized email campaign management, delivery, and optimization.
+    HOW: Uses email service provider APIs (SendGrid, Mailchimp) with templates,
+         segmentation, A/B testing, and performance tracking.
+    """
+
+    def __init__(
+        self,
+        config: AgentConfig,
+        sender_name: str = "Company Name",
+        sender_email: str = "marketing@example.com",
+        reply_to_email: str = "reply@example.com"
+    ):
+        super().__init__(config)
+
+        # Email service provider clients
+        self._esp_client: Optional[SendGridClient] = None
+        self._template_engine: Optional[TemplateEngine] = None
+
+        # Sender configuration
+        self._sender_name: str = sender_name
+        self._sender_email: str = sender_email
+        self._reply_to_email: str = reply_to_email
+
+        # Email template cache
+        self._template_cache: dict[str, EmailTemplate] = {}
+
+        # Performance tracking cache (30-minute TTL)
+        self._performance_cache: dict[str, tuple[dict[str, Any], datetime]] = {}
+        self._cache_ttl = timedelta(minutes=30)
+
+        # Strategy Pattern: Dictionary dispatch for task routing
+        self._task_handlers: dict[
+            str, Callable[[Task], Coroutine[Any, Any, dict[str, Any]]]
+        ] = {
+            "create_email_campaign": self._create_email_campaign,
+            "send_email": self._send_email,
+            "schedule_email": self._schedule_email,
+            "create_email_template": self._create_email_template,
+            "segment_email_list": self._segment_email_list,
+            "ab_test_email": self._ab_test_email,
+            "track_email_performance": self._track_email_performance,
+            "create_drip_campaign": self._create_drip_campaign,
+        }
+
+        self.logger.info(
+            f"Email Specialist initialized: {self.agent_id}",
+            extra={"sender_email": sender_email}
+        )
+
+    async def _execute_task(self, task: Task) -> dict[str, Any]:
+        """
+        Execute email-related task using Strategy Pattern.
+
+        WHY: Routes tasks to appropriate handlers without if/elif chains.
+        HOW: Uses dictionary dispatch for clean task delegation.
+        """
+        # Guard clause: Check if task type is supported
+        handler = self._task_handlers.get(task.task_type)
+        if not handler:
+            raise ValueError(f"Unsupported task type: {task.task_type}")
+
+        # Guard clause: Validate task before execution
+        if not await self.validate_task(task):
+            raise ValueError(f"Task validation failed for {task.task_id}")
+
+        try:
+            # Execute task handler
+            result = await handler(task)
+            return result
+
+        except Exception as e:
+            raise AgentExecutionError(
+                agent_id=self.agent_id,
+                task_id=task.task_id,
+                message=f"Email task execution failed: {str(e)}",
+                original_exception=e
+            )
+
+    async def validate_task(self, task: Task) -> bool:
+        """
+        Validate task parameters before execution.
+
+        WHY: Ensures tasks have required parameters for successful execution.
+        HOW: Checks for required fields based on task type.
+        """
+        required_params = {
+            "create_email_campaign": ["campaign_name", "subject_line", "recipient_list_id"],
+            "send_email": ["campaign_id"],
+            "schedule_email": ["campaign_id", "send_time"],
+            "create_email_template": ["template_name", "subject_line", "html_content"],
+            "segment_email_list": ["list_id", "segment_name", "criteria"],
+            "ab_test_email": ["campaign_id", "test_type", "variant_a", "variant_b"],
+            "track_email_performance": ["campaign_id"],
+            "create_drip_campaign": ["campaign_name", "trigger_event", "email_sequence"],
+        }
+
+        # Guard clause: Check if task type is known
+        if task.task_type not in required_params:
+            return False
+
+        # Check required parameters
+        for param in required_params[task.task_type]:
+            if param not in task.parameters:
+                self.logger.warning(
+                    f"Missing required parameter: {param}",
+                    extra={"task_id": task.task_id, "task_type": task.task_type}
+                )
+                return False
+
+        return True
+```
+
+#### Task Type 1: Create Email Campaign
+
+**Purpose:** Create and configure email campaign with template, recipient list, and settings.
+
+**Parameters:**
+- `campaign_name` (str): Name of the email campaign
+- `subject_line` (str): Email subject line
+- `recipient_list_id` (str): ID of recipient list or segment
+- `template_id` (str, optional): ID of email template to use
+- `html_content` (str, optional): HTML email content (if not using template)
+- `text_content` (str, optional): Plain text email content
+- `preheader` (str, optional): Email preheader text
+- `personalization_fields` (dict, optional): Fields for personalization
+
+**Returns:**
+```python
+{
+    "campaign_id": "campaign_12345",
+    "campaign_name": "Product Launch Announcement",
+    "subject_line": "Introducing Our New AI-Powered Platform",
+    "recipient_count": 5000,
+    "spam_score": 2.1,
+    "deliverability_status": "passed",
+    "preview_url": "https://esp.example.com/preview/campaign_12345",
+    "status": "draft"
+}
+```
+
+**Implementation:**
+```python
+async def _create_email_campaign(self, task: Task) -> dict[str, Any]:
+    """
+    Create and configure email campaign.
+
+    WHY: Enables structured email campaign creation with templates and segmentation.
+    HOW: Uses ESP API to create campaign with template, list, and settings.
+    """
+    campaign_name = task.parameters["campaign_name"]
+    template_id = task.parameters.get("template_id")
+    subject_line = task.parameters["subject_line"]
+    recipient_list_id = task.parameters["recipient_list_id"]
+    html_content = task.parameters.get("html_content")
+    text_content = task.parameters.get("text_content")
+
+    # Guard clause: Validate ESP client is available
+    if not self._esp_client:
+        return {"error": "Email service provider not configured", "campaign_id": None}
+
+    # Guard clause: Validate either template or content provided
+    if not template_id and not html_content:
+        return {"error": "Either template_id or html_content required"}
+
+    # Guard clause: Validate template exists if provided
+    if template_id and not await self._template_exists(template_id):
+        return {"error": f"Template {template_id} not found", "campaign_id": None}
+
+    try:
+        # Create campaign via ESP
+        campaign = await self._esp_client.create_campaign(
+            name=campaign_name,
+            subject=subject_line,
+            template_id=template_id,
+            html_content=html_content,
+            text_content=text_content,
+            list_id=recipient_list_id,
+            from_name=self._sender_name,
+            from_email=self._sender_email,
+            reply_to=self._reply_to_email
+        )
+
+        # Check spam score
+        spam_score = await self._check_spam_score(campaign.preview_html)
+
+        # Validate deliverability
+        deliverability_check = await self._validate_deliverability(campaign)
+
+        self.logger.info(
+            f"Email campaign created: {campaign.id}",
+            extra={
+                "campaign_name": campaign_name,
+                "recipients": campaign.recipient_count,
+                "spam_score": spam_score
+            }
+        )
+
+        return {
+            "campaign_id": campaign.id,
+            "campaign_name": campaign_name,
+            "subject_line": subject_line,
+            "recipient_count": campaign.recipient_count,
+            "spam_score": spam_score,
+            "deliverability_status": deliverability_check["status"],
+            "preview_url": campaign.preview_url,
+            "status": "draft"
+        }
+
+    except Exception as e:
+        raise AgentExecutionError(
+            agent_id=self.agent_id,
+            task_id=task.task_id,
+            message=f"Failed to create email campaign: {str(e)}",
+            original_exception=e
+        )
+```
+
+#### Task Type 2: Send Email
+
+**Purpose:** Send email campaign to recipients immediately.
+
+**Parameters:**
+- `campaign_id` (str): ID of campaign to send
+- `test_mode` (bool, optional): Send to test list only
+
+**Returns:**
+```python
+{
+    "campaign_id": "campaign_12345",
+    "status": "sending",
+    "sent_count": 5000,
+    "send_time": "2025-11-03T10:30:00Z",
+    "estimated_delivery": "2025-11-03T10:35:00Z"
+}
+```
+
+**Implementation:**
+```python
+async def _send_email(self, task: Task) -> dict[str, Any]:
+    """
+    Send email campaign to recipients.
+
+    WHY: Delivers email to recipient list immediately.
+    HOW: Uses ESP API to trigger campaign send.
+    """
+    campaign_id = task.parameters["campaign_id"]
+    test_mode = task.parameters.get("test_mode", False)
+
+    # Guard clause: Validate ESP client
+    if not self._esp_client:
+        return {"error": "Email service provider not configured"}
+
+    # Guard clause: Validate campaign exists
+    campaign = await self._get_campaign(campaign_id)
+    if not campaign:
+        return {"error": f"Campaign {campaign_id} not found"}
+
+    try:
+        # Send campaign
+        send_result = await self._esp_client.send_campaign(
+            campaign_id=campaign_id,
+            test_mode=test_mode
+        )
+
+        self.logger.info(
+            f"Email campaign sent: {campaign_id}",
+            extra={
+                "sent_count": send_result.sent_count,
+                "test_mode": test_mode
+            }
+        )
+
+        return {
+            "campaign_id": campaign_id,
+            "status": "sending",
+            "sent_count": send_result.sent_count,
+            "send_time": send_result.send_time.isoformat(),
+            "estimated_delivery": send_result.estimated_delivery.isoformat()
+        }
+
+    except Exception as e:
+        raise AgentExecutionError(
+            agent_id=self.agent_id,
+            task_id=task.task_id,
+            message=f"Failed to send email: {str(e)}",
+            original_exception=e
+        )
+```
+
+#### Task Type 3: Schedule Email
+
+**Purpose:** Schedule email campaign for future delivery.
+
+**Parameters:**
+- `campaign_id` (str): ID of campaign to schedule
+- `send_time` (str): ISO format datetime for send time
+- `timezone` (str, optional): Timezone for send time (default: UTC)
+
+**Returns:**
+```python
+{
+    "campaign_id": "campaign_12345",
+    "status": "scheduled",
+    "scheduled_send_time": "2025-11-05T09:00:00Z",
+    "recipient_count": 5000
+}
+```
+
+#### Task Type 4: Create Email Template
+
+**Purpose:** Create reusable email template with personalization support.
+
+**Parameters:**
+- `template_name` (str): Name of template
+- `subject_line` (str): Default subject line
+- `html_content` (str): HTML template content
+- `text_content` (str): Plain text template content
+- `personalization_fields` (list[str]): List of personalization fields (e.g., ["first_name", "company"])
+- `category` (str): Template category (newsletter, promotional, transactional)
+
+**Returns:**
+```python
+{
+    "template_id": "template_789",
+    "template_name": "Product Launch Template",
+    "category": "promotional",
+    "personalization_fields": ["first_name", "company", "product_name"],
+    "created_at": "2025-11-03T10:00:00Z"
+}
+```
+
+#### Task Type 5: Segment Email List
+
+**Purpose:** Segment email list based on criteria for targeted messaging.
+
+**Parameters:**
+- `list_id` (str): ID of email list to segment
+- `segment_name` (str): Name for the segment
+- `criteria` (dict): Segmentation criteria (e.g., {"engagement": "active", "location": "US"})
+
+**Returns:**
+```python
+{
+    "segment_id": "segment_456",
+    "segment_name": "Active US Subscribers",
+    "list_id": "list_123",
+    "subscriber_count": 1250,
+    "criteria": {"engagement": "active", "location": "US"},
+    "created_at": "2025-11-03T10:00:00Z"
+}
+```
+
+**Implementation:**
+```python
+async def _segment_email_list(self, task: Task) -> dict[str, Any]:
+    """
+    Segment email list based on criteria.
+
+    WHY: Enables targeted messaging to specific audience segments.
+    HOW: Applies filters to subscriber list and creates segment.
+    """
+    list_id = task.parameters["list_id"]
+    segment_name = task.parameters["segment_name"]
+    criteria = task.parameters["criteria"]
+
+    # Guard clause: Validate list exists
+    email_list = await self._get_list(list_id)
+    if not email_list:
+        return {"error": f"List {list_id} not found"}
+
+    try:
+        # Build segmentation query
+        query_conditions = []
+
+        for key, value in criteria.items():
+            if key == "engagement":
+                if value == "active":
+                    query_conditions.append("opened_last_30_days = true")
+                elif value == "inactive":
+                    query_conditions.append("opened_last_90_days = false")
+                elif value == "new":
+                    query_conditions.append("subscription_date > DATE_SUB(NOW(), INTERVAL 30 DAY)")
+            elif key == "location":
+                query_conditions.append(f"country = '{value}'")
+            elif key == "industry":
+                query_conditions.append(f"industry = '{value}'")
+            else:
+                query_conditions.append(f"{key} = '{value}'")
+
+        # Create segment via ESP
+        segment = await self._esp_client.create_segment(
+            list_id=list_id,
+            name=segment_name,
+            conditions=query_conditions
+        )
+
+        self.logger.info(
+            f"Email list segmented: {segment.id}",
+            extra={
+                "segment_name": segment_name,
+                "subscriber_count": segment.subscriber_count
+            }
+        )
+
+        return {
+            "segment_id": segment.id,
+            "segment_name": segment_name,
+            "list_id": list_id,
+            "subscriber_count": segment.subscriber_count,
+            "criteria": criteria,
+            "created_at": segment.created_at.isoformat()
+        }
+
+    except Exception as e:
+        raise AgentExecutionError(
+            agent_id=self.agent_id,
+            task_id=task.task_id,
+            message=f"Failed to segment email list: {str(e)}",
+            original_exception=e
+        )
+```
+
+#### Task Type 6: A/B Test Email
+
+**Purpose:** Create A/B test for email campaign to optimize performance.
+
+**Parameters:**
+- `campaign_id` (str): ID of campaign to test
+- `test_type` (str): Type of test (subject_line, content, send_time)
+- `variant_a` (Any): First variant (subject line, content ID, or send time)
+- `variant_b` (Any): Second variant
+- `test_size_percent` (int, optional): Percentage of list for test (default: 20)
+- `winning_metric` (str, optional): Metric to determine winner (open_rate, click_rate, conversion_rate)
+
+**Returns:**
+```python
+{
+    "ab_test_id": "test_999",
+    "campaign_id": "campaign_12345",
+    "test_type": "subject_line",
+    "variant_a": {"subject_line": "Transform Your Marketing Today"},
+    "variant_b": {"subject_line": "Revolutionize Your Marketing Strategy"},
+    "test_size_percent": 20,
+    "test_recipients": 1000,
+    "winner_selection": "automatic",
+    "status": "scheduled"
+}
+```
+
+#### Task Type 7: Track Email Performance
+
+**Purpose:** Track email campaign performance metrics and analytics.
+
+**Parameters:**
+- `campaign_id` (str): ID of campaign to track
+- `include_link_clicks` (bool, optional): Include individual link click data
+
+**Returns:**
+```python
+{
+    "campaign_id": "campaign_12345",
+    "campaign_name": "Product Launch",
+    "sent": 5000,
+    "delivered": 4950,
+    "opens": 2475,
+    "unique_opens": 2200,
+    "clicks": 742,
+    "unique_clicks": 650,
+    "bounces": 50,
+    "spam_complaints": 5,
+    "unsubscribes": 15,
+    "open_rate": 44.44,
+    "click_rate": 14.99,
+    "bounce_rate": 1.0,
+    "unsubscribe_rate": 0.30,
+    "click_to_open_rate": 29.55,
+    "revenue": 15000.00,
+    "timestamp": "2025-11-03T15:00:00Z"
+}
+```
+
+**Implementation:**
+```python
+async def _track_email_performance(self, task: Task) -> dict[str, Any]:
+    """
+    Track email campaign performance metrics.
+
+    WHY: Provides insights for optimization and ROI measurement.
+    HOW: Fetches analytics from ESP API and calculates key metrics.
+    """
+    campaign_id = task.parameters["campaign_id"]
+
+    # Check cache first (30-minute TTL)
+    cache_key = f"performance_{campaign_id}"
+    if cache_key in self._performance_cache:
+        cached_data, cached_time = self._performance_cache[cache_key]
+        if datetime.now() - cached_time < self._cache_ttl:
+            cached_data["cached"] = True
+            return cached_data
+
+    # Guard clause: Validate campaign exists
+    campaign = await self._get_campaign(campaign_id)
+    if not campaign:
+        return {"error": f"Campaign {campaign_id} not found"}
+
+    try:
+        # Fetch performance data from ESP
+        stats = await self._esp_client.get_campaign_stats(campaign_id)
+
+        # Calculate derived metrics
+        open_rate = (stats.opens / stats.delivered) * 100 if stats.delivered > 0 else 0
+        click_rate = (stats.clicks / stats.delivered) * 100 if stats.delivered > 0 else 0
+        bounce_rate = (stats.bounces / stats.sent) * 100 if stats.sent > 0 else 0
+        unsubscribe_rate = (stats.unsubscribes / stats.delivered) * 100 if stats.delivered > 0 else 0
+        click_to_open_rate = (stats.clicks / stats.opens) * 100 if stats.opens > 0 else 0
+
+        result = {
+            "campaign_id": campaign_id,
+            "campaign_name": campaign.name,
+            "sent": stats.sent,
+            "delivered": stats.delivered,
+            "opens": stats.opens,
+            "unique_opens": stats.unique_opens,
+            "clicks": stats.clicks,
+            "unique_clicks": stats.unique_clicks,
+            "bounces": stats.bounces,
+            "spam_complaints": stats.spam_complaints,
+            "unsubscribes": stats.unsubscribes,
+            "open_rate": round(open_rate, 2),
+            "click_rate": round(click_rate, 2),
+            "bounce_rate": round(bounce_rate, 2),
+            "unsubscribe_rate": round(unsubscribe_rate, 2),
+            "click_to_open_rate": round(click_to_open_rate, 2),
+            "revenue": stats.revenue if hasattr(stats, 'revenue') else 0,
+            "timestamp": datetime.now().isoformat(),
+            "cached": False
+        }
+
+        # Cache result
+        self._performance_cache[cache_key] = (result, datetime.now())
+
+        return result
+
+    except Exception as e:
+        raise AgentExecutionError(
+            agent_id=self.agent_id,
+            task_id=task.task_id,
+            message=f"Failed to track email performance: {str(e)}",
+            original_exception=e
+        )
+```
+
+#### Task Type 8: Create Drip Campaign
+
+**Purpose:** Create automated drip campaign workflow with timed email sequence.
+
+**Parameters:**
+- `campaign_name` (str): Name of drip campaign
+- `trigger_event` (str): Event that triggers campaign (subscription, purchase, download)
+- `email_sequence` (list[dict]): List of emails with delays
+  - Each email: `{"template_id": str, "delay_days": int, "subject_line": str, "condition": str (optional)}`
+
+**Returns:**
+```python
+{
+    "drip_campaign_id": "drip_555",
+    "campaign_name": "Welcome Series",
+    "trigger_event": "subscription",
+    "email_count": 5,
+    "workflow_steps": [
+        {"step_number": 1, "template_id": "welcome_1", "delay_days": 0},
+        {"step_number": 2, "template_id": "features_intro", "delay_days": 3},
+        {"step_number": 3, "template_id": "case_study", "delay_days": 7}
+    ],
+    "status": "active",
+    "created_at": "2025-11-03T10:00:00Z"
+}
+```
+
+#### State Management
+
+The Email Specialist maintains several types of state:
+
+1. **Template Cache:** Frequently used email templates cached in memory
+2. **Performance Cache:** Campaign performance data cached with 30-minute TTL
+3. **ESP Client:** Connection to email service provider API
+4. **Sender Configuration:** Default sender name, email, reply-to
+
+```python
+# Example state structure
+{
+    "_template_cache": {
+        "template_123": EmailTemplate(...),
+        "template_456": EmailTemplate(...)
+    },
+    "_performance_cache": {
+        "performance_campaign_12345": (
+            {"open_rate": 45.2, "click_rate": 15.1, ...},
+            datetime(2025, 11, 3, 14, 30, 0)
+        )
+    },
+    "_esp_client": SendGridClient(...),
+    "_sender_name": "Company Name",
+    "_sender_email": "marketing@example.com"
+}
+```
+
+#### Coordination Examples
+
+**Example 1: Campaign Manager requests email campaign**
+```python
+# Campaign Manager delegates email campaign creation
+campaign_manager -> email_specialist.create_email_campaign(
+    campaign_name="Q4 Product Launch",
+    subject_line="Introducing Our Revolutionary AI Platform",
+    recipient_list_id="segment_enterprise",
+    template_id="product_launch_template"
+)
+
+# Email Specialist creates campaign
+email_specialist -> {
+    "campaign_id": "campaign_12345",
+    "recipient_count": 5000,
+    "deliverability_status": "passed"
+}
+
+# Campaign Manager delegates sending
+campaign_manager -> email_specialist.send_email(
+    campaign_id="campaign_12345"
+)
+
+# Email Specialist sends campaign
+email_specialist -> ESP API -> Sends 5000 emails
+```
+
+**Example 2: Content Manager requests newsletter with visual assets**
+```python
+# Content Manager coordinates with Copywriter and Designer
+content_manager -> copywriter.write_email(...)
+content_manager -> designer.design_email_header(...)
+
+# Content Manager delegates to Email Specialist
+content_manager -> email_specialist.create_email_campaign(
+    campaign_name="Monthly Newsletter",
+    subject_line="Marketing Insights - November 2025",
+    html_content="<html>...</html>",  # Includes copy and header
+    recipient_list_id="newsletter_subscribers"
+)
+
+# Email Specialist creates and validates campaign
+email_specialist -> {
+    "campaign_id": "campaign_67890",
+    "spam_score": 1.8,
+    "deliverability_status": "passed"
+}
+```
+
+**Example 3: A/B testing optimization workflow**
+```python
+# Campaign Manager requests A/B test
+campaign_manager -> email_specialist.ab_test_email(
+    campaign_id="campaign_12345",
+    test_type="subject_line",
+    variant_a="Transform Your Marketing Today",
+    variant_b="Revolutionize Your Marketing Strategy",
+    test_size_percent=20
+)
+
+# Email Specialist creates A/B test
+email_specialist -> ESP API -> Creates test with 1000 recipients
+
+# After test completes, Email Specialist tracks performance
+email_specialist.track_email_performance(campaign_id="campaign_12345")
+-> {
+    "winning_variant": "variant_b",
+    "variant_a_open_rate": 38.5,
+    "variant_b_open_rate": 45.2
+}
+
+# ESP automatically sends winning variant to remaining 80%
+```
+
+**Example 4: Drip campaign automation**
+```python
+# Content Manager requests onboarding drip campaign
+content_manager -> email_specialist.create_drip_campaign(
+    campaign_name="Customer Onboarding",
+    trigger_event="subscription",
+    email_sequence=[
+        {
+            "template_id": "welcome_email",
+            "delay_days": 0,
+            "subject_line": "Welcome to Our Platform!"
+        },
+        {
+            "template_id": "getting_started",
+            "delay_days": 2,
+            "subject_line": "Get Started with Your First Project"
+        },
+        {
+            "template_id": "advanced_features",
+            "delay_days": 7,
+            "subject_line": "Unlock Advanced Features",
+            "condition": "opened_previous"
+        },
+        {
+            "template_id": "case_study",
+            "delay_days": 14,
+            "subject_line": "How Companies Like Yours Succeed"
+        }
+    ]
+)
+
+# Email Specialist creates automation workflow
+email_specialist -> ESP API -> Creates triggered automation
+
+# When user subscribes:
+user subscribes -> ESP triggers workflow -> Sends 4 emails over 14 days
+```
+
+#### Architecture Compliance
+
+The Email Specialist follows all architecture standards:
+
+**Strategy Pattern (Zero if/elif chains):**
+```python
+# ✅ CORRECT: Strategy Pattern with dictionary dispatch
+self._task_handlers = {
+    "create_email_campaign": self._create_email_campaign,
+    "send_email": self._send_email,
+    "schedule_email": self._schedule_email,
+    "create_email_template": self._create_email_template,
+    "segment_email_list": self._segment_email_list,
+    "ab_test_email": self._ab_test_email,
+    "track_email_performance": self._track_email_performance,
+    "create_drip_campaign": self._create_drip_campaign,
+}
+
+handler = self._task_handlers.get(task.task_type)
+result = await handler(task)
+
+# ❌ WRONG: if/elif chains
+if task.task_type == "create_email_campaign":
+    result = await self._create_email_campaign(task)
+elif task.task_type == "send_email":
+    result = await self._send_email(task)
+# ... more elif statements
+```
+
+**Guard Clauses (No nested ifs):**
+```python
+# ✅ CORRECT: Guard clauses with early returns
+async def _send_email(self, task: Task) -> dict[str, Any]:
+    campaign_id = task.parameters["campaign_id"]
+
+    # Guard clause: Validate ESP client
+    if not self._esp_client:
+        return {"error": "Email service provider not configured"}
+
+    # Guard clause: Validate campaign exists
+    campaign = await self._get_campaign(campaign_id)
+    if not campaign:
+        return {"error": f"Campaign {campaign_id} not found"}
+
+    # Main logic
+    send_result = await self._esp_client.send_campaign(campaign_id=campaign_id)
+    return {"campaign_id": campaign_id, "status": "sending"}
+
+# ❌ WRONG: Nested if statements
+async def _send_email(self, task: Task) -> dict[str, Any]:
+    if self._esp_client:
+        campaign = await self._get_campaign(campaign_id)
+        if campaign:
+            send_result = await self._esp_client.send_campaign(campaign_id)
+            return {"status": "sending"}
+```
+
+**Exception Wrapping:**
+```python
+# ✅ CORRECT: Wrap external API calls with AgentExecutionError
+try:
+    campaign = await self._esp_client.create_campaign(...)
+    return {"campaign_id": campaign.id}
+except Exception as e:
+    raise AgentExecutionError(
+        agent_id=self.agent_id,
+        task_id=task.task_id,
+        message=f"Failed to create email campaign: {str(e)}",
+        original_exception=e
+    )
+
+# ❌ WRONG: Let exceptions propagate
+campaign = await self._esp_client.create_campaign(...)
+```
+
+---
+
 ## 5. Data Models
 
 ### 5.1 Core Entities
