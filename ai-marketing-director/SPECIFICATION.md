@@ -1709,6 +1709,621 @@ content_manager -> analytics_specialist.get_web_analytics(
 
 ---
 
+### 4.7 Copywriter Specialist Agent (Specialist Layer)
+
+**Layer**: Specialist Layer (Execution & Expertise)
+**Role**: Content creation, brand voice consistency, multi-format writing
+**Reports To**: Content Manager, Campaign Manager, Social Media Manager
+
+**Purpose**: Create high-quality written content across multiple formats while maintaining brand voice consistency.
+
+**WHY**: Specialized writing expertise ensures high-quality, on-brand content creation at scale across all marketing channels.
+
+**Architecture Compliance**:
+- ✅ Strategy Pattern (dictionary dispatch for task routing)
+- ✅ Guard clauses only (no nested ifs)
+- ✅ Full type hints on all methods
+- ✅ WHY/HOW documentation
+- ✅ Exception wrapping with `AgentExecutionError`
+- ✅ Graceful degradation
+- ✅ TDD methodology
+
+---
+
+#### 4.7.1 Core Responsibilities
+
+1. **Content Creation**: Write blog posts, social media posts, emails, case studies, product descriptions
+2. **Brand Voice Consistency**: Maintain and enforce brand voice across all content
+3. **Multi-Format Writing**: Adapt writing style for different content types and channels
+4. **Content Variation**: Generate multiple versions for A/B testing
+5. **Quality Validation**: Check content against readability and brand standards
+6. **Rewriting**: Rewrite existing content with new tone or style
+7. **Headline Generation**: Create compelling headlines and subject lines
+8. **LLM Integration**: Use Claude for content generation with custom prompts
+
+---
+
+#### 4.7.2 Task Types (Strategy Pattern)
+
+The Copywriter Specialist supports 8 task types using Strategy Pattern (zero if/elif chains):
+
+```python
+class CopywriterSpecialistAgent(BaseAgent):
+    """
+    Specialist-layer agent for content creation and writing.
+
+    WHY: Provides specialized writing expertise for all marketing content.
+    HOW: Uses LLM (Claude) with brand voice guidelines to generate high-quality content.
+    """
+
+    def __init__(self, config: AgentConfig, brand_voice: Optional[BrandVoiceGuidelines] = None):
+        """
+        Initialize Copywriter Specialist Agent.
+
+        WHY: Set up LLM integration, brand voice, and task handler registry.
+        HOW: Initializes LLM client, loads brand guidelines, and
+             registers task handlers using Strategy Pattern.
+        """
+        super().__init__(config)
+
+        # LLM integration
+        self._llm_client: Optional[LLMClient] = None
+
+        # Brand voice configuration
+        self._brand_voice: Optional[BrandVoiceGuidelines] = brand_voice
+
+        # Content templates
+        self._content_templates: dict[str, str] = {}
+
+        # Quality thresholds
+        self._min_brand_voice_score: float = 70.0
+        self._min_readability_score: float = 60.0
+
+        # Strategy Pattern: Dictionary dispatch (zero if/elif chains)
+        self._task_handlers: dict[
+            str, Callable[[Task], Coroutine[Any, Any, dict[str, Any]]]
+        ] = {
+            "write_blog_post": self._write_blog_post,
+            "write_social_post": self._write_social_post,
+            "write_email": self._write_email,
+            "write_case_study": self._write_case_study,
+            "write_product_description": self._write_product_description,
+            "generate_headlines": self._generate_headlines,
+            "rewrite_content": self._rewrite_content,
+            "validate_brand_voice": self._validate_brand_voice_task,
+        }
+```
+
+---
+
+#### 4.7.3 Task Type Specifications
+
+##### 1. write_blog_post
+
+**Purpose**: Create long-form blog content with SEO optimization.
+
+**Parameters**:
+```python
+{
+    "topic": str,                    # Blog post topic
+    "target_audience": str,          # Target reader audience
+    "word_count": int,               # Desired word count (default: 1000)
+    "keywords": List[str],           # SEO keywords to include
+    "tone": str,                     # Optional tone override ("professional", "casual", etc.)
+    "include_sections": List[str],   # Optional section requirements
+}
+```
+
+**Returns**:
+```python
+{
+    "content": str,                  # Generated blog post (markdown)
+    "word_count": int,               # Actual word count
+    "content_type": str,             # "blog_post"
+    "brand_voice_score": float,      # Brand alignment score (0-100)
+    "readability_score": float,      # Readability score (0-100)
+    "reading_time": str,             # Estimated reading time
+    "keywords_used": List[str],      # Keywords included in content
+}
+```
+
+**Implementation**:
+```python
+async def _write_blog_post(self, task: Task) -> dict[str, Any]:
+    """
+    Write blog post using LLM with brand voice.
+
+    WHY: Provides long-form content for thought leadership and SEO.
+    HOW: Builds LLM prompt with brand voice context, generates content,
+         validates quality against brand standards.
+    """
+    topic = task.parameters["topic"]
+    target_audience = task.parameters["target_audience"]
+    word_count = task.parameters.get("word_count", 1000)
+    keywords = task.parameters.get("keywords", [])
+
+    # Guard clause: Check LLM availability
+    if not self._llm_client:
+        return {
+            "error": "LLM client not configured",
+            "content": ""
+        }
+
+    # Build prompt with brand voice context
+    prompt = self._build_blog_post_prompt(
+        topic=topic,
+        target_audience=target_audience,
+        word_count=word_count,
+        keywords=keywords
+    )
+
+    # Generate content with LLM
+    try:
+        response = await self._llm_client.generate(
+            prompt=prompt,
+            max_tokens=word_count * 2,  # Buffer for markdown
+            temperature=0.7
+        )
+
+        content = response.text
+
+        # Validate brand voice
+        brand_score = await self._validate_brand_voice(content)
+
+        # Calculate readability
+        readability_score = self._calculate_readability(content)
+
+        return {
+            "content": content,
+            "word_count": len(content.split()),
+            "content_type": "blog_post",
+            "brand_voice_score": brand_score,
+            "readability_score": readability_score,
+            "reading_time": self._calculate_reading_time(content),
+            "keywords_used": self._extract_keywords_used(content, keywords)
+        }
+    except Exception as e:
+        raise AgentExecutionError(
+            agent_id=self.agent_id,
+            task_id=task.task_id,
+            message=f"Failed to generate blog post: {str(e)}",
+            original_exception=e
+        )
+```
+
+##### 2. write_social_post
+
+**Purpose**: Create platform-specific social media posts.
+
+**Parameters**:
+```python
+{
+    "platform": str,             # "linkedin", "twitter", "facebook", "instagram"
+    "message_type": str,         # "announcement", "question", "tip", "story"
+    "topic": str,                # Post topic or theme
+    "call_to_action": str,       # Optional CTA
+    "character_limit": int,      # Platform-specific limit
+}
+```
+
+**Returns**:
+```python
+{
+    "content": str,              # Generated post text
+    "character_count": int,      # Length of post
+    "platform": str,             # Target platform
+    "hashtags": List[str],       # Suggested hashtags
+    "emoji_suggestions": List[str],  # Suggested emojis
+}
+```
+
+##### 3. write_email
+
+**Purpose**: Create email marketing copy.
+
+**Parameters**:
+```python
+{
+    "email_type": str,           # "promotional", "newsletter", "welcome", "nurture"
+    "subject_line_count": int,   # Number of subject line variations (default: 3)
+    "body_word_count": int,      # Target body word count
+    "call_to_action": str,       # Primary CTA
+    "personalization_fields": List[str],  # Fields for personalization
+}
+```
+
+**Returns**:
+```python
+{
+    "subject_lines": List[str],  # Multiple subject line options
+    "preview_text": str,         # Email preview text
+    "body_html": str,            # HTML email body
+    "body_text": str,            # Plain text version
+    "cta_text": str,             # Call-to-action text
+}
+```
+
+##### 4. write_case_study
+
+**Purpose**: Create customer success stories.
+
+**Parameters**:
+```python
+{
+    "customer_name": str,        # Customer/company name
+    "industry": str,             # Customer industry
+    "challenge": str,            # Problem customer faced
+    "solution": str,             # How product/service solved it
+    "results": dict[str, Any],   # Quantifiable results/metrics
+    "quote": Optional[str],      # Customer testimonial quote
+}
+```
+
+**Returns**:
+```python
+{
+    "content": str,              # Full case study (markdown)
+    "word_count": int,           # Length of case study
+    "structure": {
+        "challenge": str,        # Challenge section
+        "solution": str,         # Solution section
+        "results": str,          # Results section
+        "testimonial": str,      # Customer quote section
+    }
+}
+```
+
+##### 5. write_product_description
+
+**Purpose**: Create compelling product descriptions.
+
+**Parameters**:
+```python
+{
+    "product_name": str,         # Product name
+    "features": List[str],       # Key product features
+    "benefits": List[str],       # Customer benefits
+    "target_audience": str,      # Target customer
+    "length": str,               # "short" (50 words), "medium" (150), "long" (300)
+}
+```
+
+**Returns**:
+```python
+{
+    "short_description": str,    # Brief description (50 words)
+    "long_description": str,     # Detailed description
+    "features_list": str,        # Formatted features list
+    "benefits_list": str,        # Formatted benefits list
+}
+```
+
+##### 6. generate_headlines
+
+**Purpose**: Generate multiple headline variations.
+
+**Parameters**:
+```python
+{
+    "topic": str,                # Headline topic
+    "headline_type": str,        # "blog", "email_subject", "ad", "social"
+    "count": int,                # Number of variations (default: 5)
+    "character_limit": int,      # Optional character limit
+}
+```
+
+**Returns**:
+```python
+{
+    "headlines": List[{
+        "text": str,             # Headline text
+        "character_count": int,  # Length
+        "appeal_type": str,      # "curiosity", "urgency", "benefit", etc.
+    }]
+}
+```
+
+##### 7. rewrite_content
+
+**Purpose**: Rewrite existing content with new tone or style.
+
+**Parameters**:
+```python
+{
+    "original_content": str,     # Content to rewrite
+    "new_tone": str,             # Desired tone ("professional", "casual", "friendly")
+    "new_style": str,            # Style adjustments ("shorter", "longer", "simpler")
+    "preserve_meaning": bool,    # Keep original meaning (default: True)
+}
+```
+
+**Returns**:
+```python
+{
+    "rewritten_content": str,    # New version of content
+    "changes_summary": str,      # Description of changes made
+    "word_count_change": int,    # Difference in word count
+}
+```
+
+##### 8. validate_brand_voice
+
+**Purpose**: Check content against brand voice guidelines.
+
+**Parameters**:
+```python
+{
+    "content": str,              # Content to validate
+    "content_type": str,         # Type of content being validated
+}
+```
+
+**Returns**:
+```python
+{
+    "brand_voice_score": float,  # Overall score (0-100)
+    "tone_analysis": {
+        "detected_tone": List[str],
+        "matches_guidelines": bool,
+    },
+    "vocabulary_analysis": {
+        "preferred_words_used": int,
+        "avoided_words_found": List[str],
+    },
+    "readability_score": float,  # Readability score (0-100)
+    "recommendations": List[str], # Improvement suggestions
+}
+```
+
+---
+
+#### 4.7.4 Brand Voice Configuration
+
+**Brand Voice Guidelines Structure**:
+```python
+class BrandVoiceGuidelines:
+    """Configuration for brand voice consistency."""
+
+    tone_attributes: List[str]       # ["professional", "friendly", "authoritative"]
+    personality_traits: List[str]    # ["helpful", "innovative", "trustworthy"]
+    vocabulary_do: List[str]         # Encouraged words/phrases
+    vocabulary_dont: List[str]       # Words/phrases to avoid
+    sentence_structure: str          # "short and punchy" vs "flowing and descriptive"
+    reading_level: str               # "general", "technical", "executive"
+
+    def to_prompt_context(self) -> str:
+        """Convert guidelines to LLM prompt context."""
+        return f"""
+        Brand Voice Guidelines:
+        - Tone: {', '.join(self.tone_attributes)}
+        - Personality: {', '.join(self.personality_traits)}
+        - Use words like: {', '.join(self.vocabulary_do[:10])}
+        - Avoid words like: {', '.join(self.vocabulary_dont[:10])}
+        - Writing style: {self.sentence_structure}
+        - Target reading level: {self.reading_level}
+        """
+```
+
+---
+
+#### 4.7.5 Content Quality Validation
+
+**Quality Metrics**:
+```python
+async def _validate_brand_voice(self, content: str) -> float:
+    """
+    Validate content against brand voice guidelines.
+
+    WHY: Ensures content consistency with brand identity.
+    HOW: Analyzes tone, vocabulary, style, and readability.
+
+    Returns:
+        Brand voice score (0-100)
+    """
+    score = 0.0
+
+    # Tone analysis (40 points)
+    tone_score = self._analyze_tone(content)
+    score += tone_score * 0.4
+
+    # Vocabulary check (30 points)
+    vocab_score = self._check_vocabulary(content)
+    score += vocab_score * 0.3
+
+    # Readability (30 points)
+    readability = self._calculate_readability(content)
+    score += readability * 0.3
+
+    return score
+
+def _calculate_readability(self, content: str) -> float:
+    """
+    Calculate readability score using Flesch Reading Ease.
+
+    WHY: Ensures content is accessible to target audience.
+    HOW: Analyzes sentence length and syllable complexity.
+
+    Returns:
+        Readability score (0-100, higher is easier to read)
+    """
+    # Implementation uses Flesch Reading Ease formula
+    # Score 60-70 = standard (8th-9th grade level)
+    # Score 70-80 = fairly easy (7th grade level)
+    # Score 80-90 = easy (6th grade level)
+```
+
+---
+
+#### 4.7.6 Integration Points
+
+**Content Manager Workflow**:
+```python
+# Content Manager delegates content creation to Copywriter
+content_manager -> copywriter.write_blog_post(
+    topic="AI in Marketing",
+    target_audience="Marketing Directors",
+    word_count=1500,
+    keywords=["AI", "marketing", "automation"]
+)
+
+# Content Manager requests content rewrite
+content_manager -> copywriter.rewrite_content(
+    original_content=draft_content,
+    new_tone="more professional",
+    new_style="shorter paragraphs"
+)
+```
+
+**Campaign Manager Workflow**:
+```python
+# Campaign Manager requests campaign copy
+campaign_manager -> copywriter.write_email(
+    email_type="promotional",
+    subject_line_count=5,
+    call_to_action="Start Free Trial"
+)
+```
+
+**Social Media Manager Workflow**:
+```python
+# Social Media Manager requests platform-specific posts
+social_media_manager -> copywriter.write_social_post(
+    platform="linkedin",
+    message_type="announcement",
+    topic="Product Launch"
+)
+```
+
+---
+
+#### 4.7.7 LLM Prompt Engineering
+
+**Blog Post Prompt Template**:
+```python
+def _build_blog_post_prompt(
+    self, topic: str, target_audience: str, word_count: int, keywords: List[str]
+) -> str:
+    """Build LLM prompt for blog post generation."""
+
+    brand_context = ""
+    if self._brand_voice:
+        brand_context = self._brand_voice.to_prompt_context()
+
+    return f"""
+    You are a professional copywriter creating a blog post.
+
+    {brand_context}
+
+    Topic: {topic}
+    Target Audience: {target_audience}
+    Target Word Count: {word_count} words
+    SEO Keywords to include: {', '.join(keywords)}
+
+    Requirements:
+    1. Create an engaging introduction that hooks the reader
+    2. Use clear, scannable subheadings (H2 and H3)
+    3. Include practical examples and actionable insights
+    4. Naturally incorporate the SEO keywords
+    5. End with a strong conclusion and call-to-action
+    6. Write in markdown format with proper formatting
+
+    Generate the blog post:
+    """
+```
+
+---
+
+#### 4.7.8 Testing Strategy
+
+**Unit Tests** (12+ tests):
+- All 8 task types with mocked LLM
+- Brand voice validation
+- Readability calculations
+- Keyword extraction
+- Error handling (LLM failures)
+
+**Integration Tests** (6+ tests):
+- Full content creation workflows
+- Brand voice consistency across content types
+- Multi-format content generation
+- Content quality validation
+- Rewriting workflows
+
+**Example Test**:
+```python
+@pytest.mark.asyncio
+async def test_write_blog_post_with_brand_voice(
+    self, agent_config, mock_llm_client, brand_guidelines
+):
+    """Test blog post creation with brand voice validation."""
+    agent = CopywriterSpecialistAgent(
+        config=agent_config,
+        brand_voice=brand_guidelines
+    )
+    agent._llm_client = mock_llm_client
+
+    task = Task(
+        task_type="write_blog_post",
+        parameters={
+            "topic": "AI in Marketing",
+            "target_audience": "Marketing Directors",
+            "word_count": 1000,
+            "keywords": ["AI", "marketing", "automation"]
+        }
+    )
+
+    result = await agent.execute(task)
+
+    assert result.status == TaskStatus.COMPLETED
+    assert "content" in result.result
+    assert result.result["brand_voice_score"] >= 70.0
+    assert len(result.result["keywords_used"]) > 0
+```
+
+---
+
+#### 4.7.9 Performance Considerations
+
+**LLM Token Usage**:
+- Blog posts: ~2000-4000 tokens
+- Social posts: ~100-300 tokens
+- Emails: ~500-1000 tokens
+- Case studies: ~2000-3000 tokens
+
+**Caching Strategy**:
+- Cache brand voice prompts (reused across calls)
+- Cache content templates
+- No caching of generated content (always fresh)
+
+**Error Handling**:
+- LLM timeout: Return error with partial content if available
+- Rate limiting: Implement exponential backoff
+- Quality threshold failures: Return content with warnings
+
+---
+
+#### 4.7.10 Coordination with Other Specialists
+
+```python
+# Copywriter → SEO Specialist
+# Copywriter creates draft, passes to SEO for optimization
+copywriter_result = await copywriter.execute(blog_task)
+seo_task = Task(task_type="optimize_content", parameters={
+    "content": copywriter_result.result["content"],
+    "keywords": ["AI", "marketing"]
+})
+
+# Copywriter → Designer
+# Copywriter creates content, Designer creates visuals
+copywriter_result = await copywriter.execute(blog_task)
+designer_task = Task(task_type="create_featured_image", parameters={
+    "content_topic": task.parameters["topic"],
+    "content_tone": "professional"
+})
+```
+
+---
+
 ## 5. Data Models
 
 ### 5.1 Core Entities
