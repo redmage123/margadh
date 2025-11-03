@@ -2324,6 +2324,867 @@ designer_task = Task(task_type="create_featured_image", parameters={
 
 ---
 
+### 4.8 SEO Specialist Agent (Specialist Layer)
+
+**Role**: SEO Specialist
+**Layer**: Specialist Layer
+**Reports To**: Content Manager, Campaign Manager
+**Coordinates With**: Copywriter Specialist, Analytics Specialist
+
+#### 4.8.1 Purpose
+
+**WHY**: Provides specialized SEO (Search Engine Optimization) expertise to improve organic search visibility and rankings.
+
+**HOW**: Conducts keyword research, optimizes content for search engines, analyzes SERP competition, generates meta descriptions, tracks rankings, and provides SEO recommendations using external SEO tools and AI-powered analysis.
+
+The SEO Specialist bridges the gap between content creation and search engine performance, ensuring all content is optimized for discoverability and rankings.
+
+#### 4.8.2 Capabilities
+
+The SEO Specialist Agent provides these specialized capabilities:
+
+1. **Keyword Research**
+   - Research relevant keywords for content topics
+   - Analyze keyword difficulty and search volume
+   - Identify long-tail keyword opportunities
+   - Competitive keyword analysis
+   - Keyword clustering and mapping
+
+2. **Content SEO Optimization**
+   - Analyze content SEO quality
+   - Optimize keyword usage and density
+   - Improve content structure for SEO
+   - Suggest content improvements
+   - Calculate SEO scores
+
+3. **SERP Analysis**
+   - Analyze search engine results pages
+   - Identify ranking factors for top results
+   - Competitive content gap analysis
+   - Calculate opportunity scores
+   - Track SERP features (featured snippets, PAA)
+
+4. **Meta Content Generation**
+   - Generate SEO-optimized meta descriptions
+   - Create compelling title tags
+   - Optimize for click-through rate
+   - A/B test variations
+   - Character count optimization
+
+5. **Internal Linking Strategy**
+   - Suggest internal linking opportunities
+   - Optimize site architecture
+   - Distribute page authority
+   - Create topic clusters
+   - Fix broken links
+
+6. **SEO Auditing**
+   - Audit content for SEO issues
+   - Identify technical SEO problems
+   - Check mobile-friendliness
+   - Validate structured data
+   - Performance optimization recommendations
+
+7. **Ranking Tracking**
+   - Monitor keyword rankings over time
+   - Track ranking changes and trends
+   - Competitor ranking analysis
+   - SERP volatility detection
+   - Geographic ranking tracking
+
+8. **SEO Reporting**
+   - Generate comprehensive SEO reports
+   - Organic traffic analysis
+   - Conversion tracking from organic search
+   - ROI calculations for SEO efforts
+   - Actionable recommendations
+
+#### 4.8.3 Task Types
+
+The SEO Specialist handles these task types using **Strategy Pattern** (dictionary dispatch):
+
+```python
+class SEOSpecialistAgent(BaseAgent):
+    """
+    Specialist-layer agent for SEO and search optimization.
+
+    WHY: Provides specialized SEO expertise for improving organic search visibility.
+    HOW: Uses external SEO tools, Search Console data, and AI analysis to optimize
+         content, research keywords, and track performance.
+    """
+
+    def __init__(self, config: AgentConfig):
+        super().__init__(config)
+
+        # External SEO tool clients
+        self._search_console_client: Optional[SearchConsoleClient] = None
+        self._semrush_client: Optional[SEMrushClient] = None
+        self._ahrefs_client: Optional[AhrefsClient] = None
+
+        # LLM for AI-powered analysis
+        self._llm_client: Optional[LLMClient] = None
+
+        # Caching for API rate limiting (24-hour TTL)
+        self._keyword_cache: dict[str, tuple[datetime, dict[str, Any]]] = {}
+        self._serp_cache: dict[str, tuple[datetime, dict[str, Any]]] = {}
+        self._cache_ttl_hours: int = 24
+
+        # Keyword database
+        self._keyword_research: dict[str, dict[str, Any]] = {}
+        self._ranking_history: dict[str, list[dict[str, Any]]] = {}
+
+        # Strategy Pattern: Dictionary dispatch for task routing
+        self._task_handlers: dict[
+            str, Callable[[Task], Coroutine[Any, Any, dict[str, Any]]]
+        ] = {
+            "keyword_research": self._keyword_research_task,
+            "optimize_content": self._optimize_content,
+            "analyze_serp": self._analyze_serp,
+            "generate_meta_descriptions": self._generate_meta_descriptions,
+            "suggest_internal_links": self._suggest_internal_links,
+            "audit_seo": self._audit_seo,
+            "track_rankings": self._track_rankings,
+            "generate_seo_report": self._generate_seo_report,
+        }
+
+    async def _execute_task(self, task: Task) -> dict[str, Any]:
+        """
+        Execute task using Strategy Pattern.
+
+        WHY: Eliminates if/elif chains for better maintainability.
+        HOW: Uses dictionary dispatch to route to appropriate handler.
+        """
+        # Guard clause: Check if task type is supported
+        if task.task_type not in self._task_handlers:
+            raise AgentExecutionError(
+                agent_id=self.agent_id,
+                task_id=task.task_id,
+                message=f"Unsupported task type: {task.task_type}"
+            )
+
+        handler = self._task_handlers[task.task_type]
+
+        # Execute handler with exception wrapping
+        try:
+            return await handler(task)
+        except Exception as e:
+            raise AgentExecutionError(
+                agent_id=self.agent_id,
+                task_id=task.task_id,
+                message=f"Task execution failed: {str(e)}",
+                original_exception=e
+            )
+```
+
+##### Task Type 1: keyword_research
+
+Research and analyze keywords for content topics.
+
+**Parameters:**
+- `topic` (required): Content topic for keyword research
+- `target_audience` (optional): Target audience for keyword selection
+- `language` (optional): Language for keywords (default: "en")
+- `location` (optional): Geographic location for keyword data
+- `count` (optional): Number of keywords to return (default: 20)
+
+**Returns:**
+```python
+{
+    "primary_keywords": [
+        {
+            "keyword": "AI marketing tools",
+            "search_volume": 8100,
+            "difficulty": 65,
+            "cpc": 12.50,
+            "intent": "commercial"
+        },
+        # ... more primary keywords
+    ],
+    "secondary_keywords": [...],
+    "long_tail_keywords": [...],
+    "recommendations": [
+        "Target 'AI marketing automation' as primary focus keyword",
+        "Include long-tail variations for content sections",
+        "Consider 'marketing AI tools' as secondary target"
+    ],
+    "topic": "AI Marketing Tools",
+    "total_search_volume": 50000,
+    "average_difficulty": 58.5
+}
+```
+
+**Example:**
+```python
+keyword_task = Task(
+    task_type="keyword_research",
+    parameters={
+        "topic": "AI Marketing Tools",
+        "target_audience": "Marketing Directors",
+        "language": "en",
+        "count": 20
+    },
+    assigned_to=AgentRole.SEO_SPECIALIST,
+    assigned_by=AgentRole.CONTENT_MANAGER
+)
+```
+
+##### Task Type 2: optimize_content
+
+Optimize existing content for target keywords.
+
+**Parameters:**
+- `content` (required): Content text to optimize
+- `target_keywords` (required): List of keywords to optimize for
+- `content_type` (optional): Type of content (blog_post, landing_page, etc.)
+
+**Returns:**
+```python
+{
+    "optimized": True,
+    "current_score": 72.5,
+    "potential_score": 88.0,
+    "suggestions": [
+        {
+            "category": "keyword_usage",
+            "issue": "Primary keyword appears only once",
+            "recommendation": "Include 'AI marketing tools' 3-4 more times naturally",
+            "priority": "high"
+        },
+        {
+            "category": "content_structure",
+            "issue": "Missing H2 heading with target keyword",
+            "recommendation": "Add H2 heading: 'Top AI Marketing Tools for 2025'",
+            "priority": "medium"
+        },
+        {
+            "category": "readability",
+            "issue": "Average sentence length too high (25 words)",
+            "recommendation": "Break long sentences for better readability",
+            "priority": "medium"
+        }
+    ],
+    "issues_found": 5,
+    "keyword_density": {
+        "AI marketing tools": 0.8,  # Percentage
+        "marketing automation": 1.2
+    },
+    "recommended_changes": [
+        "Add keyword to first paragraph",
+        "Include keyword in one H2 heading",
+        "Add keyword variation in conclusion"
+    ]
+}
+```
+
+##### Task Type 3: analyze_serp
+
+Analyze search engine results page for target keyword.
+
+**Parameters:**
+- `keyword` (required): Target keyword to analyze
+- `location` (optional): Geographic location for SERP (default: "US")
+- `device` (optional): Device type (desktop, mobile) (default: "desktop")
+
+**Returns:**
+```python
+{
+    "keyword": "AI marketing tools",
+    "location": "US",
+    "top_results": [
+        {
+            "position": 1,
+            "url": "https://example.com/ai-marketing-tools",
+            "title": "15 Best AI Marketing Tools for 2025",
+            "domain_authority": 72,
+            "word_count": 3500,
+            "content_type": "listicle",
+            "has_featured_snippet": False
+        },
+        # ... more results
+    ],
+    "competition_level": "high",  # high, medium, low
+    "content_gaps": [
+        "Most results don't cover AI for email marketing",
+        "Limited coverage of pricing comparisons",
+        "Few results include video content"
+    ],
+    "ranking_factors": {
+        "avg_word_count": 2800,
+        "avg_domain_authority": 68,
+        "common_content_types": ["listicle", "guide", "comparison"],
+        "avg_backlinks": 450
+    },
+    "opportunity_score": 65,  # 0-100, higher = better opportunity
+    "recommendations": [
+        "Create comprehensive guide with 2500+ words",
+        "Include pricing comparison table",
+        "Add video demonstrations",
+        "Target featured snippet with FAQ section"
+    ]
+}
+```
+
+##### Task Type 4: generate_meta_descriptions
+
+Generate SEO-optimized meta descriptions and title tags.
+
+**Parameters:**
+- `content` (required): Content to generate meta description for
+- `target_keywords` (required): Keywords to include
+- `variations` (optional): Number of variations to generate (default: 3)
+
+**Returns:**
+```python
+{
+    "meta_descriptions": [
+        {
+            "text": "Discover 15 powerful AI marketing tools that streamline campaigns, boost ROI, and automate content creation. Compare features & pricing.",
+            "character_count": 145,
+            "keyword_included": True,
+            "ctr_score": 85  # Estimated CTR score
+        },
+        # ... more variations
+    ],
+    "title_tags": [
+        {
+            "text": "15 Best AI Marketing Tools for 2025 | Features & Pricing",
+            "character_count": 58,
+            "keyword_included": True,
+            "ctr_score": 88
+        },
+        # ... more variations
+    ],
+    "recommendations": [
+        "Use variation #1 for highest estimated CTR",
+        "Test variations with A/B testing",
+        "Include year '2025' to show freshness"
+    ]
+}
+```
+
+##### Task Type 5: suggest_internal_links
+
+Suggest internal linking opportunities for content.
+
+**Parameters:**
+- `content_id` (required): ID of content to suggest links for
+- `content` (required): Content text
+- `max_suggestions` (optional): Maximum links to suggest (default: 5)
+
+**Returns:**
+```python
+{
+    "suggestions": [
+        {
+            "anchor_text": "marketing automation",
+            "target_url": "/blog/marketing-automation-guide",
+            "relevance_score": 92,
+            "context": "Use in paragraph 3 when discussing automation benefits",
+            "reason": "Highly relevant content that adds value"
+        },
+        # ... more suggestions
+    ],
+    "topic_cluster": {
+        "pillar_page": "/marketing-tools",
+        "cluster_pages": [
+            "/blog/email-marketing-tools",
+            "/blog/social-media-tools",
+            "/blog/analytics-tools"
+        ]
+    },
+    "architecture_recommendations": [
+        "Create pillar page for 'Marketing Tools' topic",
+        "Link all tool reviews to pillar page",
+        "Add breadcrumb navigation"
+    ]
+}
+```
+
+##### Task Type 6: audit_seo
+
+Audit content for SEO issues and opportunities.
+
+**Parameters:**
+- `content_id` (optional): Specific content to audit
+- `url` (optional): URL to audit
+- `scope` (optional): Audit scope (on_page, technical, both) (default: "both")
+
+**Returns:**
+```python
+{
+    "overall_score": 75.5,
+    "issues": [
+        {
+            "severity": "high",
+            "category": "on_page",
+            "issue": "Missing meta description",
+            "affected_pages": ["/blog/post-1", "/blog/post-2"],
+            "fix": "Add meta descriptions to all pages"
+        },
+        {
+            "severity": "medium",
+            "category": "technical",
+            "issue": "Slow page load time (4.2s)",
+            "affected_pages": ["/"],
+            "fix": "Optimize images and enable caching"
+        }
+    ],
+    "opportunities": [
+        {
+            "category": "content",
+            "opportunity": "Add FAQ schema markup",
+            "estimated_impact": "high",
+            "effort": "low"
+        }
+    ],
+    "technical_issues": [
+        "3 pages with 404 errors",
+        "Mobile responsiveness issues on 2 pages",
+        "Missing XML sitemap"
+    ],
+    "recommendations": [
+        "Fix high-priority issues first (missing meta descriptions)",
+        "Implement FAQ schema for featured snippets",
+        "Improve site speed with image optimization"
+    ]
+}
+```
+
+##### Task Type 7: track_rankings
+
+Monitor keyword rankings over time.
+
+**Parameters:**
+- `keywords` (required): List of keywords to track
+- `location` (optional): Geographic location (default: "US")
+- `device` (optional): Device type (default: "desktop")
+
+**Returns:**
+```python
+{
+    "rankings": [
+        {
+            "keyword": "AI marketing tools",
+            "current_position": 12,
+            "previous_position": 15,
+            "change": +3,
+            "url": "/blog/ai-marketing-tools",
+            "search_volume": 8100,
+            "trend": "improving"
+        },
+        # ... more keywords
+    ],
+    "summary": {
+        "total_keywords": 50,
+        "improved": 28,
+        "declined": 12,
+        "stable": 10,
+        "top_3": 8,
+        "top_10": 15,
+        "top_20": 22
+    },
+    "alerts": [
+        "Keyword 'marketing automation' dropped 8 positions",
+        "New ranking for 'AI email marketing' in position 18"
+    ],
+    "recommendations": [
+        "Update content for declining keywords",
+        "Capitalize on improving trends with more content",
+        "Refresh content for keywords stuck at position 11-20"
+    ]
+}
+```
+
+##### Task Type 8: generate_seo_report
+
+Generate comprehensive SEO performance report.
+
+**Parameters:**
+- `date_range` (required): Date range for report (e.g., "last_30_days")
+- `include_charts` (optional): Include visualization data (default: True)
+- `report_type` (optional): Type of report (summary, detailed) (default: "summary")
+
+**Returns:**
+```python
+{
+    "report_id": "seo_report_2025_11",
+    "period": "2025-10-01 to 2025-11-01",
+    "organic_traffic": {
+        "sessions": 45000,
+        "change_percent": 12.5,
+        "new_users": 38000,
+        "returning_users": 7000
+    },
+    "keyword_performance": {
+        "total_keywords_ranking": 450,
+        "new_keywords": 35,
+        "lost_keywords": 12,
+        "top_10_keywords": 78,
+        "avg_position": 18.5
+    },
+    "content_performance": [
+        {
+            "url": "/blog/ai-marketing-tools",
+            "sessions": 5200,
+            "avg_position": 8,
+            "keywords_ranking": 25
+        },
+        # ... more content
+    ],
+    "conversions": {
+        "total": 450,
+        "conversion_rate": 1.0,
+        "revenue": 45000
+    },
+    "recommendations": [
+        "Focus on improving rankings for positions 11-20",
+        "Update top-performing content with fresh data",
+        "Expand keyword targeting in email marketing topic"
+    ],
+    "action_items": [
+        {
+            "priority": "high",
+            "action": "Optimize 5 pages stuck at position 11-15",
+            "estimated_impact": "15% traffic increase"
+        }
+    ]
+}
+```
+
+#### 4.8.4 State Management
+
+The SEO Specialist maintains these state components:
+
+```python
+class SEOSpecialistAgent(BaseAgent):
+    def __init__(self, config: AgentConfig):
+        super().__init__(config)
+
+        # Keyword research database
+        self._keyword_research: dict[str, dict[str, Any]] = {}
+        # Format: {
+        #     "topic_key": {
+        #         "topic": "AI Marketing",
+        #         "keywords": [...],
+        #         "researched_at": datetime,
+        #         "search_volume": 50000
+        #     }
+        # }
+
+        # Ranking history
+        self._ranking_history: dict[str, list[dict[str, Any]]] = {}
+        # Format: {
+        #     "keyword": [
+        #         {
+        #             "position": 12,
+        #             "url": "/blog/post",
+        #             "checked_at": datetime
+        #         }
+        #     ]
+        # }
+
+        # SERP cache (24-hour TTL)
+        self._serp_cache: dict[str, tuple[datetime, dict[str, Any]]] = {}
+
+        # Keyword cache (24-hour TTL)
+        self._keyword_cache: dict[str, tuple[datetime, dict[str, Any]]] = {}
+
+        # SEO audit results
+        self._audit_results: dict[str, dict[str, Any]] = {}
+
+        # Content SEO scores
+        self._content_scores: dict[str, float] = {}
+```
+
+#### 4.8.5 External Integrations
+
+The SEO Specialist integrates with these external services:
+
+**Google Search Console API:**
+- Fetch search analytics data
+- Monitor rankings and CTR
+- Identify indexing issues
+- Submit sitemaps
+
+**SEMrush API:**
+- Keyword research and difficulty
+- SERP analysis
+- Competitor analysis
+- Backlink data
+
+**Ahrefs API (Optional):**
+- Additional keyword data
+- Backlink analysis
+- Content gap analysis
+- Domain authority metrics
+
+**AI/LLM (Claude):**
+- Content optimization suggestions
+- Meta description generation
+- SEO recommendation synthesis
+- Competitive analysis insights
+
+#### 4.8.6 Coordination Examples
+
+**With Content Manager:**
+```python
+# Content Manager requests keyword research for editorial calendar
+content_manager -> seo_specialist.keyword_research(
+    topic="AI Marketing Trends 2025",
+    target_audience="Marketing Directors"
+)
+
+# Content Manager requests SEO audit before publishing
+content_manager -> seo_specialist.audit_seo(
+    content_id="blog_001",
+    scope="on_page"
+)
+```
+
+**With Copywriter Specialist:**
+```python
+# Copywriter requests keyword research for blog post
+copywriter -> seo_specialist.keyword_research(
+    topic="Marketing Automation",
+    content_type="blog_post"
+)
+
+# Copywriter requests content optimization review
+copywriter -> seo_specialist.optimize_content(
+    content="...",
+    target_keywords=["marketing automation", "workflow automation"]
+)
+
+# Copywriter requests meta descriptions
+copywriter -> seo_specialist.generate_meta_descriptions(
+    content="...",
+    target_keywords=["marketing automation"]
+)
+```
+
+**With Campaign Manager:**
+```python
+# Campaign Manager requests SEO performance report
+campaign_manager -> seo_specialist.generate_seo_report(
+    date_range="last_30_days",
+    campaign_id="campaign_001"
+)
+
+# Campaign Manager requests ranking tracking
+campaign_manager -> seo_specialist.track_rankings(
+    keywords=campaign_keywords
+)
+```
+
+**With Analytics Specialist:**
+```python
+# SEO Specialist requests organic traffic data
+seo_specialist -> analytics_specialist.get_web_analytics(
+    metrics=["organic_sessions", "organic_conversions"],
+    date_range="last_90_days"
+)
+```
+
+#### 4.8.7 SEO Score Calculation
+
+The SEO Specialist calculates comprehensive SEO scores:
+
+```python
+def _calculate_seo_score(
+    self,
+    content: str,
+    target_keywords: list[str]
+) -> float:
+    """
+    Calculate comprehensive SEO quality score for content.
+
+    WHY: Provides quantitative measure of content SEO optimization.
+    HOW: Analyzes multiple SEO factors with weighted scoring.
+
+    Returns:
+        SEO score (0-100)
+    """
+    score = 0.0
+
+    # Keyword optimization (30 points)
+    keyword_score = self._score_keyword_usage(content, target_keywords)
+    score += keyword_score * 0.30
+
+    # Content quality (25 points)
+    quality_score = self._score_content_quality(content)
+    score += quality_score * 0.25
+
+    # Readability (20 points)
+    readability_score = self._score_readability(content)
+    score += readability_score * 0.20
+
+    # Structure (15 points) - headings, paragraphs, lists
+    structure_score = self._score_content_structure(content)
+    score += structure_score * 0.15
+
+    # Keyword density (10 points) - optimal range 1-2%
+    density_score = self._score_keyword_density(content, target_keywords)
+    score += density_score * 0.10
+
+    return min(score, 100.0)
+
+def _score_keyword_usage(
+    self,
+    content: str,
+    target_keywords: list[str]
+) -> float:
+    """
+    Score keyword usage in content.
+
+    WHY: Keywords must appear naturally throughout content.
+    HOW: Checks keyword placement in strategic locations.
+    """
+    score = 0.0
+    content_lower = content.lower()
+
+    for keyword in target_keywords:
+        keyword_lower = keyword.lower()
+
+        # Check first paragraph (important for SEO)
+        first_para = content_lower[:500]
+        if keyword_lower in first_para:
+            score += 25.0
+
+        # Check headings
+        if keyword_lower in self._extract_headings(content).lower():
+            score += 25.0
+
+        # Check last paragraph
+        last_para = content_lower[-500:]
+        if keyword_lower in last_para:
+            score += 15.0
+
+        # Check URL slug (if available)
+        # score += 10.0 if in URL
+
+        # Check overall presence
+        count = content_lower.count(keyword_lower)
+        if count >= 3:
+            score += 25.0
+        elif count >= 1:
+            score += 15.0
+
+    return min(score / len(target_keywords), 100.0)
+```
+
+#### 4.8.8 Caching Strategy
+
+To respect API rate limits and reduce costs, the SEO Specialist implements caching:
+
+```python
+async def _get_cached_or_fetch_keywords(
+    self,
+    cache_key: str,
+    fetch_fn: Callable[[], Coroutine[Any, Any, dict[str, Any]]]
+) -> dict[str, Any]:
+    """
+    Get keyword data from cache or fetch fresh data with 24-hour TTL.
+
+    WHY: Reduces API calls and costs for SEO tool APIs.
+    HOW: Caches keyword research for 24 hours, as data doesn't change frequently.
+    """
+    # Guard clause: Check cache
+    if cache_key in self._keyword_cache:
+        cached_time, cached_data = self._keyword_cache[cache_key]
+        time_elapsed = datetime.now() - cached_time
+
+        if time_elapsed < timedelta(hours=self._cache_ttl_hours):
+            return {**cached_data, "cached": True}
+
+    # Fetch fresh data
+    try:
+        fresh_data = await fetch_fn()
+        self._keyword_cache[cache_key] = (datetime.now(), fresh_data)
+        return fresh_data
+    except Exception as e:
+        # Graceful degradation: Return stale cache if available
+        if cache_key in self._keyword_cache:
+            _, stale_data = self._keyword_cache[cache_key]
+            return {
+                **stale_data,
+                "cached": True,
+                "warning": "Using stale cached data due to API failure"
+            }
+
+        raise AgentExecutionError(
+            agent_id=self.agent_id,
+            task_id="unknown",
+            message=f"Failed to fetch keyword data: {str(e)}",
+            original_exception=e
+        )
+```
+
+#### 4.8.9 Architecture Compliance
+
+**Strategy Pattern:**
+```python
+# ✅ CORRECT: Dictionary dispatch
+self._task_handlers = {
+    "keyword_research": self._keyword_research_task,
+    "optimize_content": self._optimize_content,
+    # ... other handlers
+}
+
+# ❌ WRONG: if/elif chains
+if task.task_type == "keyword_research":
+    return await self._keyword_research_task(task)
+elif task.task_type == "optimize_content":
+    return await self._optimize_content(task)
+```
+
+**Guard Clauses:**
+```python
+# ✅ CORRECT: Guard clause for early return
+async def _optimize_content(self, task: Task) -> dict[str, Any]:
+    content = task.parameters.get("content")
+
+    # Guard clause: Validate content exists
+    if not content:
+        return {"error": "Content is required", "optimized": False}
+
+    # Guard clause: Check if already optimized
+    score = self._calculate_seo_score(content, keywords)
+    if score >= 90.0:
+        return {"optimized": False, "reason": "Already well-optimized", "score": score}
+
+    # Main logic here
+    return await self._perform_optimization(content, keywords)
+
+# ❌ WRONG: Nested if statements
+async def _optimize_content(self, task: Task) -> dict[str, Any]:
+    content = task.parameters.get("content")
+
+    if content:
+        score = self._calculate_seo_score(content, keywords)
+        if score < 90.0:
+            # Deep nesting
+            return await self._perform_optimization(content, keywords)
+```
+
+**Exception Wrapping:**
+```python
+# ✅ CORRECT: Wrap external API calls
+try:
+    keyword_data = await self._semrush_client.keyword_research(topic)
+except Exception as e:
+    raise AgentExecutionError(
+        agent_id=self.agent_id,
+        task_id=task.task_id,
+        message=f"SEMrush API failed: {str(e)}",
+        original_exception=e
+    )
+
+# ❌ WRONG: Let exceptions propagate
+keyword_data = await self._semrush_client.keyword_research(topic)
+```
+
+---
+
 ## 5. Data Models
 
 ### 5.1 Core Entities
