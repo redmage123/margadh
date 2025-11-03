@@ -6432,6 +6432,2550 @@ trends_data = await self._google_trends_client.get_interest_over_time(...)
 
 ---
 
+### 4.12 VP Marketing Agent (Executive Layer)
+
+The **VP Marketing Agent** is an executive-layer agent responsible for day-to-day marketing operations, team coordination, campaign approval, and tactical execution of CMO strategy. It bridges strategic direction from the CMO with operational execution by management-layer teams.
+
+**Agent Role:** `AgentRole.VP_MARKETING`
+
+**Supervised By:** CMO Agent
+
+**Supervises:** Content Manager, Social Media Manager, Campaign Manager
+
+**Coordinates With:** Director of Communications (brand alignment), Analytics Specialist (operational metrics), Market Research (tactical insights)
+
+**Role in Hierarchy:** Executive Layer - translates CMO strategy into tactical plans, coordinates management-layer operations, approves campaigns, manages day-to-day marketing activities.
+
+#### Purpose and Responsibilities
+
+**Purpose**: Executive-layer agent responsible for day-to-day marketing operations, team coordination, campaign approval, and tactical execution of CMO strategy.
+
+**Core Responsibilities**:
+- Translate CMO strategy into actionable tactical plans and weekly sprints
+- Coordinate daily operations across management-layer agents (Content, Social, Campaign)
+- Review and approve campaigns before execution to ensure strategic alignment
+- Monitor team performance, workload distribution, and operational metrics
+- Facilitate cross-functional collaboration between management teams
+- Escalate strategic decisions, budget conflicts, and resource constraints to CMO
+- Provide operational reporting and status updates to executive leadership
+- Ensure quality standards, brand consistency, and strategic alignment
+- Manage tactical resource allocation within CMO-approved budgets
+- Resolve conflicts and prioritization disputes between management teams
+
+#### Architecture
+
+```python
+class VPMarketingAgent(BaseAgent):
+    """
+    Executive-layer agent for marketing operations and team coordination.
+
+    WHY: Bridges strategy (CMO) and execution (management layer) with
+         day-to-day operational leadership and tactical coordination.
+    HOW: Coordinates management teams, approves campaigns, monitors operations,
+         manages sprints, escalates strategic decisions to CMO.
+    """
+
+    def __init__(
+        self,
+        config: AgentConfig,
+        cmo_agent: Optional[Any] = None
+    ):
+        super().__init__(config)
+
+        # Management team references (supervised agents)
+        self._content_manager: Optional[Any] = None
+        self._social_media_manager: Optional[Any] = None
+        self._campaign_manager: Optional[Any] = None
+
+        # Management team registry
+        self._management_team: dict[AgentRole, Optional[Any]] = {
+            AgentRole.CONTENT_MANAGER: None,
+            AgentRole.SOCIAL_MEDIA_MANAGER: None,
+            AgentRole.CAMPAIGN_MANAGER: None,
+        }
+
+        # CMO reference for escalation
+        self._cmo_agent: Optional[Any] = cmo_agent
+
+        # Operational state management
+        self._pending_approvals: list[dict[str, Any]] = []
+        self._active_sprints: list[dict[str, Any]] = []
+        self._team_workload: dict[str, dict[str, Any]] = {}
+        self._escalations: list[dict[str, Any]] = []
+
+        # Approval thresholds (auto-escalate to CMO if exceeded)
+        self._approval_thresholds = {
+            "budget_limit": 50000,  # Campaigns over $50k need CMO approval
+            "duration_days": 90,     # Campaigns over 90 days need CMO approval
+            "team_capacity": 0.85,   # Escalate if team utilization > 85%
+        }
+
+        # Sprint planning state
+        self._current_sprint: Optional[dict[str, Any]] = None
+        self._sprint_duration_days = 7  # Weekly sprints
+
+        # Performance tracking
+        self._operational_metrics: dict[str, Any] = {
+            "campaigns_approved": 0,
+            "campaigns_rejected": 0,
+            "escalations_to_cmo": 0,
+            "avg_approval_time_hours": 0.0,
+            "team_coordination_score": 0.0,
+        }
+
+        # Strategy Pattern: Dictionary dispatch for task routing
+        self._task_handlers: dict[
+            str, Callable[[Task], Coroutine[Any, Any, dict[str, Any]]]
+        ] = {
+            "coordinate_teams": self._coordinate_teams,
+            "approve_campaign": self._approve_campaign,
+            "assign_priorities": self._assign_priorities,
+            "review_content": self._review_content,
+            "monitor_operations": self._monitor_operations,
+            "resolve_conflicts": self._resolve_conflicts,
+            "plan_sprint": self._plan_sprint,
+            "report_status": self._report_status,
+            "allocate_resources": self._allocate_resources,
+            "evaluate_team_performance": self._evaluate_team_performance,
+        }
+
+        self.logger.info(
+            f"VP Marketing Agent initialized: {self.agent_id}",
+            extra={"sprint_duration": self._sprint_duration_days}
+        )
+
+    def register_management_agent(
+        self,
+        role: AgentRole,
+        agent: Any
+    ) -> None:
+        """
+        Register a management-layer agent for supervision.
+
+        WHY: VP Marketing needs references to coordinate management team.
+        HOW: Stores agent references in registry for delegation and coordination.
+        """
+        if role not in self._management_team:
+            raise ValueError(f"Role {role} is not a management-layer role")
+
+        self._management_team[role] = agent
+
+        if role == AgentRole.CONTENT_MANAGER:
+            self._content_manager = agent
+        elif role == AgentRole.SOCIAL_MEDIA_MANAGER:
+            self._social_media_manager = agent
+        elif role == AgentRole.CAMPAIGN_MANAGER:
+            self._campaign_manager = agent
+
+        self.logger.info(f"Registered management agent: {role}")
+
+    async def _execute_task(self, task: Task) -> dict[str, Any]:
+        """
+        Execute VP Marketing task using Strategy Pattern.
+
+        WHY: Routes tasks to appropriate handlers without if/elif chains.
+        HOW: Uses dictionary dispatch for clean task delegation.
+        """
+        # Guard clause: Check if task type is supported
+        handler = self._task_handlers.get(task.task_type)
+        if not handler:
+            raise ValueError(f"Unsupported task type: {task.task_type}")
+
+        # Guard clause: Validate task before execution
+        validation_errors = self._validate_task(task)
+        if validation_errors:
+            raise ValueError(f"Task validation failed: {validation_errors}")
+
+        # Execute task
+        try:
+            result = await handler(task)
+
+            # Track metrics
+            self._update_operational_metrics(task, result)
+
+            return result
+
+        except Exception as e:
+            raise AgentExecutionError(
+                agent_id=self.agent_id,
+                task_id=task.task_id,
+                message=f"VP Marketing task execution failed: {str(e)}",
+                original_exception=e
+            )
+```
+
+#### Supported Task Types
+
+The VP Marketing Agent supports 10 task types for operational leadership and team coordination:
+
+#### Task Type 1: Coordinate Teams
+
+**Purpose:** Coordinate activities across management-layer agents to ensure alignment and collaboration.
+
+**Parameters:**
+- `initiative_name` (str): Name of the cross-team initiative
+- `involved_teams` (list[str]): Teams to coordinate (e.g., ["content", "social", "campaign"])
+- `objective` (str): Coordination objective
+- `timeline` (dict): Start and end dates
+- `deliverables` (list[dict]): Expected deliverables from each team
+
+**Returns:**
+```python
+{
+    "initiative_id": "init_123",
+    "coordination_plan": {
+        "teams_involved": ["content", "social", "campaign"],
+        "coordination_schedule": [
+            {
+                "date": "2025-11-05",
+                "milestone": "Content drafts due",
+                "responsible_team": "content"
+            },
+            {
+                "date": "2025-11-08",
+                "milestone": "Social media calendar finalized",
+                "responsible_team": "social"
+            }
+        ],
+        "dependencies": [
+            {
+                "from": "content",
+                "to": "social",
+                "dependency": "Blog posts must be ready before social promotion"
+            }
+        ]
+    },
+    "checkpoints": [
+        {"date": "2025-11-06", "type": "progress_review"},
+        {"date": "2025-11-10", "type": "final_review"}
+    ],
+    "escalation_triggers": [
+        "Any team more than 24h behind schedule",
+        "Budget overrun by more than 10%"
+    ],
+    "status": "coordination_active"
+}
+```
+
+**Implementation:**
+```python
+async def _coordinate_teams(self, task: Task) -> dict[str, Any]:
+    """
+    Coordinate activities across management-layer teams.
+
+    WHY: Ensures cross-functional alignment and collaboration.
+    HOW: Creates coordination plan, sets checkpoints, tracks dependencies.
+    """
+    initiative_name = task.parameters["initiative_name"]
+    involved_teams = task.parameters["involved_teams"]
+    objective = task.parameters["objective"]
+    timeline = task.parameters["timeline"]
+    deliverables = task.parameters["deliverables"]
+
+    # Guard clause: Validate all required teams are registered
+    missing_teams = [
+        team for team in involved_teams
+        if not self._is_team_available(team)
+    ]
+    if missing_teams:
+        return {
+            "error": f"Required teams not available: {missing_teams}",
+            "status": "coordination_failed"
+        }
+
+    try:
+        # Generate unique initiative ID
+        initiative_id = f"init_{datetime.now().strftime('%Y%m%d%H%M%S')}"
+
+        # Create coordination plan
+        coordination_plan = await self._create_coordination_plan(
+            initiative_name=initiative_name,
+            teams=involved_teams,
+            objective=objective,
+            timeline=timeline,
+            deliverables=deliverables
+        )
+
+        # Notify each team of their responsibilities
+        notification_results = await self._notify_teams(
+            teams=involved_teams,
+            initiative_id=initiative_id,
+            coordination_plan=coordination_plan
+        )
+
+        # Set up checkpoints and monitoring
+        checkpoints = self._setup_coordination_checkpoints(timeline)
+
+        # Store coordination state
+        coordination = {
+            "initiative_id": initiative_id,
+            "initiative_name": initiative_name,
+            "coordination_plan": coordination_plan,
+            "checkpoints": checkpoints,
+            "teams_notified": notification_results,
+            "status": "coordination_active",
+            "created_at": datetime.now().isoformat()
+        }
+
+        self.logger.info(
+            f"Team coordination established: {initiative_name}",
+            extra={
+                "initiative_id": initiative_id,
+                "teams": involved_teams
+            }
+        )
+
+        return coordination
+
+    except Exception as e:
+        raise AgentExecutionError(
+            agent_id=self.agent_id,
+            task_id=task.task_id,
+            message=f"Failed to coordinate teams: {str(e)}",
+            original_exception=e
+        )
+```
+
+#### Task Type 2: Approve Campaign
+
+**Purpose:** Review campaign proposals and approve or reject based on strategic alignment, budget, and resource availability.
+
+**Parameters:**
+- `campaign_id` (str): ID of campaign to review
+- `review_criteria` (list[str], optional): Specific criteria to evaluate
+- `auto_escalate` (bool, optional): Escalate to CMO if thresholds exceeded - default: True
+
+**Returns:**
+```python
+{
+    "campaign_id": "camp_456",
+    "campaign_name": "Q4 Product Launch",
+    "approval_decision": "approved",  # or "rejected", "escalated_to_cmo"
+    "approval_rationale": "Strong strategic alignment with Q4 goals. Budget within limits. Resources available.",
+    "conditions": [
+        "Reduce social media budget by 15% to stay within allocated limits",
+        "Coordinate with Product team for launch timing"
+    ],
+    "modifications_required": [
+        {
+            "field": "budget.social_media",
+            "current_value": 20000,
+            "required_value": 17000,
+            "reason": "Social budget allocation exceeded"
+        }
+    ],
+    "strategic_alignment_score": 8.5,  # 0-10
+    "resource_availability_score": 7.8,
+    "budget_fit_score": 9.2,
+    "risk_assessment": {
+        "overall_risk": "low",
+        "risk_factors": [
+            {"factor": "Timeline aggressive", "severity": "medium", "mitigation": "Add buffer days"}
+        ]
+    },
+    "approved_by": "vp_marketing_001",
+    "approval_timestamp": "2025-11-03T14:30:00Z",
+    "next_steps": [
+        "Campaign Manager to implement modifications",
+        "Final review scheduled for 2025-11-05"
+    ]
+}
+```
+
+**Implementation:**
+```python
+async def _approve_campaign(self, task: Task) -> dict[str, Any]:
+    """
+    Review and approve/reject campaign proposals.
+
+    WHY: Ensure campaigns meet strategic, budget, and resource criteria before launch.
+    HOW: Evaluates campaign against approval criteria, escalates if needed, provides decision.
+    """
+    campaign_id = task.parameters["campaign_id"]
+    review_criteria = task.parameters.get("review_criteria", [])
+    auto_escalate = task.parameters.get("auto_escalate", True)
+
+    # Guard clause: Verify campaign manager is available
+    if not self._campaign_manager:
+        return {"error": "Campaign Manager not available", "status": "approval_failed"}
+
+    try:
+        # Fetch campaign details from Campaign Manager
+        campaign_data = await self._fetch_campaign_details(campaign_id)
+
+        # Guard clause: Campaign not found
+        if not campaign_data:
+            return {"error": f"Campaign not found: {campaign_id}", "status": "approval_failed"}
+
+        # Evaluate campaign against approval criteria
+        evaluation = await self._evaluate_campaign_proposal(
+            campaign_data=campaign_data,
+            review_criteria=review_criteria
+        )
+
+        # Check if escalation to CMO is required
+        if auto_escalate and self._should_escalate_to_cmo(campaign_data, evaluation):
+            escalation_result = await self._escalate_to_cmo(
+                campaign_id=campaign_id,
+                campaign_data=campaign_data,
+                evaluation=evaluation,
+                reason="Campaign exceeds VP approval thresholds"
+            )
+
+            self._escalations.append({
+                "campaign_id": campaign_id,
+                "escalated_at": datetime.now().isoformat(),
+                "reason": "Threshold exceeded"
+            })
+
+            return escalation_result
+
+        # Make approval decision
+        approval_decision = self._make_approval_decision(evaluation)
+
+        # Update pending approvals
+        self._pending_approvals = [
+            a for a in self._pending_approvals
+            if a.get("campaign_id") != campaign_id
+        ]
+
+        # Track metrics
+        if approval_decision["approval_decision"] == "approved":
+            self._operational_metrics["campaigns_approved"] += 1
+        else:
+            self._operational_metrics["campaigns_rejected"] += 1
+
+        self.logger.info(
+            f"Campaign approval decision: {approval_decision['approval_decision']}",
+            extra={
+                "campaign_id": campaign_id,
+                "decision": approval_decision["approval_decision"]
+            }
+        )
+
+        return approval_decision
+
+    except Exception as e:
+        raise AgentExecutionError(
+            agent_id=self.agent_id,
+            task_id=task.task_id,
+            message=f"Failed to approve campaign: {str(e)}",
+            original_exception=e
+        )
+```
+
+#### Task Type 3: Assign Priorities
+
+**Purpose:** Set tactical priorities for management teams to guide resource allocation and focus.
+
+**Parameters:**
+- `priority_scope` (str): Scope of prioritization (e.g., "weekly", "sprint", "monthly")
+- `priority_items` (list[dict]): Items to prioritize with metadata
+- `prioritization_criteria` (list[str], optional): Criteria for prioritization
+
+**Returns:**
+```python
+{
+    "priority_scope": "weekly",
+    "priority_period": {
+        "start_date": "2025-11-04",
+        "end_date": "2025-11-10"
+    },
+    "prioritized_items": [
+        {
+            "rank": 1,
+            "item_type": "campaign",
+            "item_id": "camp_123",
+            "item_name": "Product Launch Campaign",
+            "priority_level": "critical",
+            "assigned_team": "campaign_manager",
+            "rationale": "Strategic importance to Q4 revenue goals",
+            "estimated_effort": "40 hours",
+            "deadline": "2025-11-08"
+        },
+        {
+            "rank": 2,
+            "item_type": "content",
+            "item_id": "cont_456",
+            "item_name": "Thought Leadership Blog Series",
+            "priority_level": "high",
+            "assigned_team": "content_manager",
+            "rationale": "Supports brand positioning and SEO goals",
+            "estimated_effort": "24 hours",
+            "deadline": "2025-11-09"
+        },
+        {
+            "rank": 3,
+            "item_type": "social",
+            "item_id": "soc_789",
+            "item_name": "LinkedIn Engagement Campaign",
+            "priority_level": "medium",
+            "assigned_team": "social_media_manager",
+            "rationale": "Improves brand awareness",
+            "estimated_effort": "16 hours",
+            "deadline": "2025-11-10"
+        }
+    ],
+    "team_capacity_allocation": {
+        "campaign_manager": {"allocated_hours": 40, "capacity_used": "80%"},
+        "content_manager": {"allocated_hours": 24, "capacity_used": "60%"},
+        "social_media_manager": {"allocated_hours": 16, "capacity_used": "40%"}
+    },
+    "conflicts_identified": [
+        {
+            "conflict": "Campaign Manager at 80% capacity",
+            "resolution": "Defer lower priority items to next sprint"
+        }
+    ],
+    "status": "priorities_assigned"
+}
+```
+
+**Implementation:**
+```python
+async def _assign_priorities(self, task: Task) -> dict[str, Any]:
+    """
+    Set tactical priorities for management teams.
+
+    WHY: Guide resource allocation and ensure focus on strategic objectives.
+    HOW: Evaluates items against criteria, ranks by importance, allocates to teams.
+    """
+    priority_scope = task.parameters["priority_scope"]
+    priority_items = task.parameters["priority_items"]
+    prioritization_criteria = task.parameters.get(
+        "prioritization_criteria",
+        ["strategic_alignment", "urgency", "resource_availability"]
+    )
+
+    try:
+        # Determine priority period based on scope
+        priority_period = self._calculate_priority_period(priority_scope)
+
+        # Evaluate and rank items
+        ranked_items = await self._rank_priority_items(
+            items=priority_items,
+            criteria=prioritization_criteria,
+            period=priority_period
+        )
+
+        # Check team capacity
+        capacity_analysis = await self._analyze_team_capacity(ranked_items)
+
+        # Identify and resolve conflicts
+        conflicts = self._identify_priority_conflicts(
+            ranked_items=ranked_items,
+            capacity_analysis=capacity_analysis
+        )
+
+        # Notify teams of their priorities
+        await self._notify_teams_of_priorities(ranked_items)
+
+        result = {
+            "priority_scope": priority_scope,
+            "priority_period": priority_period,
+            "prioritized_items": ranked_items,
+            "team_capacity_allocation": capacity_analysis,
+            "conflicts_identified": conflicts,
+            "status": "priorities_assigned",
+            "assigned_at": datetime.now().isoformat()
+        }
+
+        self.logger.info(
+            f"Priorities assigned: {priority_scope}",
+            extra={"items_count": len(ranked_items), "conflicts": len(conflicts)}
+        )
+
+        return result
+
+    except Exception as e:
+        raise AgentExecutionError(
+            agent_id=self.agent_id,
+            task_id=task.task_id,
+            message=f"Failed to assign priorities: {str(e)}",
+            original_exception=e
+        )
+```
+
+#### Task Type 4: Review Content
+
+**Purpose:** Review content quality and brand alignment before publication.
+
+**Parameters:**
+- `content_id` (str): ID of content to review
+- `review_type` (str): Type of review (e.g., "brand_alignment", "quality", "full")
+- `expedited` (bool, optional): Rush review - default: False
+
+**Returns:**
+```python
+{
+    "content_id": "cont_789",
+    "content_title": "The Future of AI in Marketing",
+    "review_decision": "approved_with_changes",  # or "approved", "rejected"
+    "review_type": "full",
+    "quality_scores": {
+        "brand_voice_alignment": 8.5,  # 0-10
+        "readability": 9.0,
+        "seo_optimization": 7.8,
+        "grammar_accuracy": 9.5,
+        "call_to_action_effectiveness": 8.0
+    },
+    "required_changes": [
+        {
+            "section": "Introduction",
+            "issue": "Opening lacks strong hook",
+            "recommendation": "Add compelling statistic or question to engage readers"
+        },
+        {
+            "section": "SEO",
+            "issue": "Missing meta description",
+            "recommendation": "Add 155-character meta description with primary keyword"
+        }
+    ],
+    "brand_alignment_notes": "Content aligns well with thought leadership positioning. Voice is professional and authoritative.",
+    "approval_conditions": [
+        "Implement required changes within 24 hours",
+        "Final proofread by copywriter"
+    ],
+    "reviewed_by": "vp_marketing_001",
+    "review_timestamp": "2025-11-03T15:45:00Z",
+    "escalation_to_cmo": False,
+    "next_steps": [
+        "Content Manager to coordinate revisions",
+        "Re-submit for final approval after changes"
+    ]
+}
+```
+
+**Implementation:**
+```python
+async def _review_content(self, task: Task) -> dict[str, Any]:
+    """
+    Review content quality and brand alignment.
+
+    WHY: Ensure all published content meets quality and brand standards.
+    HOW: Evaluates content against multiple criteria, provides feedback and decision.
+    """
+    content_id = task.parameters["content_id"]
+    review_type = task.parameters["review_type"]
+    expedited = task.parameters.get("expedited", False)
+
+    # Guard clause: Verify content manager is available
+    if not self._content_manager:
+        return {"error": "Content Manager not available", "status": "review_failed"}
+
+    try:
+        # Fetch content from Content Manager
+        content_data = await self._fetch_content_for_review(content_id)
+
+        # Guard clause: Content not found
+        if not content_data:
+            return {"error": f"Content not found: {content_id}", "status": "review_failed"}
+
+        # Perform quality evaluation based on review type
+        quality_scores = await self._evaluate_content_quality(
+            content_data=content_data,
+            review_type=review_type
+        )
+
+        # Check brand alignment
+        brand_alignment = await self._check_brand_alignment(content_data)
+
+        # Identify required changes
+        required_changes = self._identify_content_changes(
+            content_data=content_data,
+            quality_scores=quality_scores,
+            brand_alignment=brand_alignment
+        )
+
+        # Make review decision
+        review_decision = self._make_content_review_decision(
+            quality_scores=quality_scores,
+            required_changes=required_changes,
+            brand_alignment=brand_alignment
+        )
+
+        result = {
+            "content_id": content_id,
+            "content_title": content_data.get("title"),
+            "review_decision": review_decision["decision"],
+            "review_type": review_type,
+            "quality_scores": quality_scores,
+            "required_changes": required_changes,
+            "brand_alignment_notes": brand_alignment.get("notes"),
+            "approval_conditions": review_decision.get("conditions", []),
+            "reviewed_by": self.agent_id,
+            "review_timestamp": datetime.now().isoformat(),
+            "escalation_to_cmo": False,
+            "next_steps": review_decision.get("next_steps", [])
+        }
+
+        self.logger.info(
+            f"Content review completed: {review_decision['decision']}",
+            extra={
+                "content_id": content_id,
+                "decision": review_decision["decision"]
+            }
+        )
+
+        return result
+
+    except Exception as e:
+        raise AgentExecutionError(
+            agent_id=self.agent_id,
+            task_id=task.task_id,
+            message=f"Failed to review content: {str(e)}",
+            original_exception=e
+        )
+```
+
+#### Task Type 5: Monitor Operations
+
+**Purpose:** Monitor daily operational metrics and team performance.
+
+**Parameters:**
+- `monitoring_scope` (str): Scope of monitoring (e.g., "daily", "weekly", "team_specific")
+- `teams` (list[str], optional): Specific teams to monitor
+- `metrics` (list[str], optional): Specific metrics to track
+
+**Returns:**
+```python
+{
+    "monitoring_scope": "daily",
+    "monitoring_period": {
+        "start_date": "2025-11-03",
+        "end_date": "2025-11-03"
+    },
+    "team_performance": {
+        "content_manager": {
+            "tasks_completed": 12,
+            "tasks_in_progress": 5,
+            "tasks_blocked": 1,
+            "completion_rate": "92%",
+            "avg_task_completion_time_hours": 4.5,
+            "quality_score": 8.7,
+            "capacity_utilization": "75%",
+            "status": "healthy"
+        },
+        "social_media_manager": {
+            "tasks_completed": 18,
+            "tasks_in_progress": 3,
+            "tasks_blocked": 0,
+            "completion_rate": "100%",
+            "avg_task_completion_time_hours": 2.1,
+            "quality_score": 9.2,
+            "capacity_utilization": "60%",
+            "status": "healthy"
+        },
+        "campaign_manager": {
+            "tasks_completed": 8,
+            "tasks_in_progress": 7,
+            "tasks_blocked": 2,
+            "completion_rate": "80%",
+            "avg_task_completion_time_hours": 8.3,
+            "quality_score": 8.5,
+            "capacity_utilization": "90%",
+            "status": "at_capacity"
+        }
+    },
+    "operational_health": {
+        "overall_status": "caution",
+        "health_score": 7.8,  # 0-10
+        "issues_identified": [
+            {
+                "severity": "medium",
+                "issue": "Campaign Manager at 90% capacity with blocked tasks",
+                "impact": "May cause delays in campaign launches",
+                "recommendation": "Redistribute tasks or adjust priorities"
+            }
+        ]
+    },
+    "key_metrics": {
+        "total_tasks_completed_today": 38,
+        "avg_team_utilization": "75%",
+        "pending_approvals_count": 3,
+        "escalations_to_cmo_today": 1,
+        "cross_team_collaboration_score": 8.2
+    },
+    "alerts": [
+        {
+            "type": "capacity_warning",
+            "team": "campaign_manager",
+            "message": "Team at 90% capacity - consider resource reallocation"
+        }
+    ],
+    "recommendations": [
+        "Review Campaign Manager workload and redistribute tasks",
+        "Address 2 blocked tasks with Campaign Manager",
+        "Maintain current operations for Content and Social teams"
+    ]
+}
+```
+
+**Implementation:**
+```python
+async def _monitor_operations(self, task: Task) -> dict[str, Any]:
+    """
+    Monitor daily operational metrics and team performance.
+
+    WHY: Track operational health and identify issues proactively.
+    HOW: Aggregates metrics from management teams, analyzes performance, generates alerts.
+    """
+    monitoring_scope = task.parameters["monitoring_scope"]
+    teams = task.parameters.get("teams", ["content", "social", "campaign"])
+    metrics = task.parameters.get("metrics", [])
+
+    try:
+        # Determine monitoring period
+        monitoring_period = self._calculate_monitoring_period(monitoring_scope)
+
+        # Collect performance data from each team
+        team_performance = {}
+        for team in teams:
+            performance_data = await self._collect_team_performance(
+                team=team,
+                period=monitoring_period,
+                metrics=metrics
+            )
+            team_performance[team] = performance_data
+
+        # Analyze operational health
+        operational_health = self._analyze_operational_health(team_performance)
+
+        # Calculate key metrics
+        key_metrics = self._calculate_key_operational_metrics(team_performance)
+
+        # Generate alerts for issues
+        alerts = self._generate_operational_alerts(
+            team_performance=team_performance,
+            operational_health=operational_health
+        )
+
+        # Generate recommendations
+        recommendations = self._generate_operational_recommendations(
+            team_performance=team_performance,
+            alerts=alerts
+        )
+
+        result = {
+            "monitoring_scope": monitoring_scope,
+            "monitoring_period": monitoring_period,
+            "team_performance": team_performance,
+            "operational_health": operational_health,
+            "key_metrics": key_metrics,
+            "alerts": alerts,
+            "recommendations": recommendations,
+            "monitored_at": datetime.now().isoformat()
+        }
+
+        self.logger.info(
+            f"Operations monitoring completed: {monitoring_scope}",
+            extra={
+                "health_score": operational_health["health_score"],
+                "alerts_count": len(alerts)
+            }
+        )
+
+        return result
+
+    except Exception as e:
+        raise AgentExecutionError(
+            agent_id=self.agent_id,
+            task_id=task.task_id,
+            message=f"Failed to monitor operations: {str(e)}",
+            original_exception=e
+        )
+```
+
+#### Task Type 6: Resolve Conflicts
+
+**Purpose:** Mediate conflicts between management-layer agents regarding priorities, resources, or timelines.
+
+**Parameters:**
+- `conflict_type` (str): Type of conflict (e.g., "priority", "resource", "timeline")
+- `involved_teams` (list[str]): Teams involved in conflict
+- `conflict_description` (str): Description of the conflict
+- `resolution_preference` (str, optional): Preferred resolution approach
+
+**Returns:**
+```python
+{
+    "conflict_id": "conf_123",
+    "conflict_type": "resource",
+    "involved_teams": ["content_manager", "campaign_manager"],
+    "conflict_summary": "Both teams need Designer resources for competing priorities",
+    "resolution": {
+        "approach": "time_sharing",
+        "decision": "Designer allocated to Campaign Manager Mon-Wed, Content Manager Thu-Fri",
+        "rationale": "Campaign has Q4 deadline priority, but Content team needs consistent access",
+        "compromise_required": True
+    },
+    "team_agreements": {
+        "content_manager": {
+            "accepted": True,
+            "conditions": ["Guaranteed Thu-Fri access", "Advance notice for urgent needs"]
+        },
+        "campaign_manager": {
+            "accepted": True,
+            "conditions": ["Priority for Q4 campaign assets", "Flexible on specific days"]
+        }
+    },
+    "implementation_plan": [
+        {
+            "step": 1,
+            "action": "Update Designer allocation schedule",
+            "responsible": "vp_marketing",
+            "deadline": "2025-11-04"
+        },
+        {
+            "step": 2,
+            "action": "Notify Designer of new schedule",
+            "responsible": "vp_marketing",
+            "deadline": "2025-11-04"
+        },
+        {
+            "step": 3,
+            "action": "Monitor allocation effectiveness",
+            "responsible": "vp_marketing",
+            "deadline": "2025-11-11"
+        }
+    ],
+    "escalated_to_cmo": False,
+    "resolution_timestamp": "2025-11-03T16:00:00Z",
+    "follow_up_required": True,
+    "follow_up_date": "2025-11-11"
+}
+```
+
+**Implementation:**
+```python
+async def _resolve_conflicts(self, task: Task) -> dict[str, Any]:
+    """
+    Mediate conflicts between management-layer agents.
+
+    WHY: Ensure smooth operations by resolving disputes fairly and efficiently.
+    HOW: Analyzes conflict, evaluates options, negotiates resolution, implements decision.
+    """
+    conflict_type = task.parameters["conflict_type"]
+    involved_teams = task.parameters["involved_teams"]
+    conflict_description = task.parameters["conflict_description"]
+    resolution_preference = task.parameters.get("resolution_preference")
+
+    # Guard clause: Verify all involved teams are registered
+    unregistered_teams = [
+        team for team in involved_teams
+        if not self._is_team_available(team)
+    ]
+    if unregistered_teams:
+        return {
+            "error": f"Teams not available: {unregistered_teams}",
+            "status": "resolution_failed"
+        }
+
+    try:
+        # Generate conflict ID
+        conflict_id = f"conf_{datetime.now().strftime('%Y%m%d%H%M%S')}"
+
+        # Gather context from involved teams
+        team_perspectives = await self._gather_team_perspectives(
+            teams=involved_teams,
+            conflict_description=conflict_description
+        )
+
+        # Analyze conflict and identify resolution options
+        resolution_options = await self._analyze_conflict_resolution_options(
+            conflict_type=conflict_type,
+            team_perspectives=team_perspectives,
+            resolution_preference=resolution_preference
+        )
+
+        # Select best resolution approach
+        selected_resolution = self._select_resolution_approach(resolution_options)
+
+        # Negotiate with teams
+        team_agreements = await self._negotiate_with_teams(
+            teams=involved_teams,
+            resolution=selected_resolution
+        )
+
+        # Guard clause: Check if escalation to CMO is needed
+        if not self._all_teams_agreed(team_agreements):
+            return await self._escalate_conflict_to_cmo(
+                conflict_id=conflict_id,
+                conflict_type=conflict_type,
+                involved_teams=involved_teams,
+                failed_resolution=selected_resolution,
+                team_agreements=team_agreements
+            )
+
+        # Create implementation plan
+        implementation_plan = self._create_resolution_implementation_plan(
+            resolution=selected_resolution,
+            teams=involved_teams
+        )
+
+        # Implement resolution
+        await self._implement_resolution(implementation_plan)
+
+        result = {
+            "conflict_id": conflict_id,
+            "conflict_type": conflict_type,
+            "involved_teams": involved_teams,
+            "conflict_summary": conflict_description,
+            "resolution": selected_resolution,
+            "team_agreements": team_agreements,
+            "implementation_plan": implementation_plan,
+            "escalated_to_cmo": False,
+            "resolution_timestamp": datetime.now().isoformat(),
+            "follow_up_required": True,
+            "follow_up_date": self._calculate_follow_up_date()
+        }
+
+        self.logger.info(
+            f"Conflict resolved: {conflict_type}",
+            extra={
+                "conflict_id": conflict_id,
+                "teams": involved_teams
+            }
+        )
+
+        return result
+
+    except Exception as e:
+        raise AgentExecutionError(
+            agent_id=self.agent_id,
+            task_id=task.task_id,
+            message=f"Failed to resolve conflict: {str(e)}",
+            original_exception=e
+        )
+```
+
+#### Task Type 7: Plan Sprint
+
+**Purpose:** Plan weekly/sprint-level marketing activities for management teams.
+
+**Parameters:**
+- `sprint_name` (str): Name of the sprint
+- `sprint_duration_days` (int, optional): Duration in days - default: 7
+- `sprint_goals` (list[str]): Goals for this sprint
+- `available_capacity` (dict[str, float], optional): Team capacity percentages
+
+**Returns:**
+```python
+{
+    "sprint_id": "sprint_47",
+    "sprint_name": "Week of Nov 4 - Q4 Push",
+    "sprint_period": {
+        "start_date": "2025-11-04",
+        "end_date": "2025-11-10",
+        "duration_days": 7
+    },
+    "sprint_goals": [
+        "Launch Q4 product campaign",
+        "Publish 3 thought leadership blogs",
+        "Increase LinkedIn engagement by 20%"
+    ],
+    "team_allocations": {
+        "content_manager": {
+            "capacity_available": "80%",
+            "planned_tasks": [
+                {
+                    "task_id": "task_101",
+                    "task_name": "Write Product Launch Blog",
+                    "estimated_hours": 8,
+                    "priority": "critical",
+                    "deadline": "2025-11-06"
+                },
+                {
+                    "task_id": "task_102",
+                    "task_name": "Create Case Study",
+                    "estimated_hours": 12,
+                    "priority": "high",
+                    "deadline": "2025-11-08"
+                }
+            ],
+            "total_planned_hours": 20,
+            "utilization": "62.5%"
+        },
+        "social_media_manager": {
+            "capacity_available": "90%",
+            "planned_tasks": [
+                {
+                    "task_id": "task_201",
+                    "task_name": "LinkedIn Campaign Posts",
+                    "estimated_hours": 6,
+                    "priority": "high",
+                    "deadline": "2025-11-05"
+                }
+            ],
+            "total_planned_hours": 6,
+            "utilization": "16.7%"
+        },
+        "campaign_manager": {
+            "capacity_available": "75%",
+            "planned_tasks": [
+                {
+                    "task_id": "task_301",
+                    "task_name": "Q4 Campaign Launch",
+                    "estimated_hours": 24,
+                    "priority": "critical",
+                    "deadline": "2025-11-07"
+                }
+            ],
+            "total_planned_hours": 24,
+            "utilization": "80%"
+        }
+    },
+    "sprint_capacity_summary": {
+        "total_available_hours": 112,
+        "total_planned_hours": 50,
+        "overall_utilization": "44.6%",
+        "capacity_buffer": "55.4%"
+    },
+    "dependencies": [
+        {
+            "from_task": "task_101",
+            "to_task": "task_201",
+            "dependency_type": "content_required",
+            "description": "Social posts need blog content"
+        }
+    ],
+    "risks": [
+        {
+            "risk": "Campaign Manager at 80% utilization - limited buffer",
+            "mitigation": "Monitor progress daily, defer non-critical tasks if needed"
+        }
+    ],
+    "daily_standup_schedule": [
+        {"date": "2025-11-04", "time": "09:00", "attendees": ["all_teams"]},
+        {"date": "2025-11-06", "time": "09:00", "attendees": ["all_teams"]},
+        {"date": "2025-11-08", "time": "09:00", "attendees": ["all_teams"]}
+    ],
+    "sprint_review_date": "2025-11-10",
+    "status": "sprint_planned"
+}
+```
+
+**Implementation:**
+```python
+async def _plan_sprint(self, task: Task) -> dict[str, Any]:
+    """
+    Plan weekly/sprint-level marketing activities.
+
+    WHY: Organize work into manageable sprints with clear goals and capacity planning.
+    HOW: Analyzes goals, allocates tasks to teams, manages capacity, tracks dependencies.
+    """
+    sprint_name = task.parameters["sprint_name"]
+    sprint_duration_days = task.parameters.get("sprint_duration_days", 7)
+    sprint_goals = task.parameters["sprint_goals"]
+    available_capacity = task.parameters.get("available_capacity", {})
+
+    try:
+        # Generate sprint ID
+        sprint_id = f"sprint_{datetime.now().strftime('%Y%W')}"
+
+        # Calculate sprint period
+        sprint_period = self._calculate_sprint_period(sprint_duration_days)
+
+        # Break down sprint goals into tasks
+        sprint_tasks = await self._break_down_sprint_goals(
+            goals=sprint_goals,
+            period=sprint_period
+        )
+
+        # Allocate tasks to teams based on capacity
+        team_allocations = await self._allocate_sprint_tasks_to_teams(
+            tasks=sprint_tasks,
+            available_capacity=available_capacity,
+            sprint_period=sprint_period
+        )
+
+        # Calculate capacity utilization
+        capacity_summary = self._calculate_sprint_capacity_summary(team_allocations)
+
+        # Identify task dependencies
+        dependencies = self._identify_sprint_dependencies(sprint_tasks)
+
+        # Assess sprint risks
+        risks = self._assess_sprint_risks(
+            team_allocations=team_allocations,
+            capacity_summary=capacity_summary,
+            dependencies=dependencies
+        )
+
+        # Schedule sprint ceremonies
+        daily_standup_schedule = self._schedule_sprint_ceremonies(sprint_period)
+
+        # Store sprint as current sprint
+        sprint = {
+            "sprint_id": sprint_id,
+            "sprint_name": sprint_name,
+            "sprint_period": sprint_period,
+            "sprint_goals": sprint_goals,
+            "team_allocations": team_allocations,
+            "sprint_capacity_summary": capacity_summary,
+            "dependencies": dependencies,
+            "risks": risks,
+            "daily_standup_schedule": daily_standup_schedule,
+            "sprint_review_date": sprint_period["end_date"],
+            "status": "sprint_planned",
+            "created_at": datetime.now().isoformat()
+        }
+
+        self._current_sprint = sprint
+        self._active_sprints.append(sprint)
+
+        # Notify teams of sprint plan
+        await self._notify_teams_of_sprint_plan(sprint)
+
+        self.logger.info(
+            f"Sprint planned: {sprint_name}",
+            extra={
+                "sprint_id": sprint_id,
+                "tasks_count": len(sprint_tasks),
+                "utilization": capacity_summary["overall_utilization"]
+            }
+        )
+
+        return sprint
+
+    except Exception as e:
+        raise AgentExecutionError(
+            agent_id=self.agent_id,
+            task_id=task.task_id,
+            message=f"Failed to plan sprint: {str(e)}",
+            original_exception=e
+        )
+```
+
+#### Task Type 8: Report Status
+
+**Purpose:** Generate operational status reports for CMO and executive leadership.
+
+**Parameters:**
+- `report_type` (str): Type of report (e.g., "daily", "weekly", "executive_summary")
+- `report_period` (dict): Start and end dates for report
+- `include_sections` (list[str], optional): Specific sections to include
+
+**Returns:**
+```python
+{
+    "report_type": "weekly",
+    "report_period": {
+        "start_date": "2025-10-28",
+        "end_date": "2025-11-03"
+    },
+    "executive_summary": {
+        "overall_status": "on_track",
+        "key_highlights": [
+            "Q4 campaign launched successfully - 15% above engagement targets",
+            "Content production increased 20% week-over-week",
+            "Social media engagement up 12% across all platforms"
+        ],
+        "key_challenges": [
+            "Campaign Manager team at capacity - resource constraint identified",
+            "2 content pieces delayed due to approval bottleneck"
+        ],
+        "week_ahead_priorities": [
+            "Scale Q4 campaign based on early success",
+            "Address resource constraints in Campaign team",
+            "Launch thought leadership content series"
+        ]
+    },
+    "team_performance_summary": {
+        "content_manager": {
+            "status": "exceeding_expectations",
+            "tasks_completed": 47,
+            "completion_rate": "94%",
+            "quality_score": 8.8,
+            "key_achievements": ["Published 5 blog posts", "2 case studies completed"]
+        },
+        "social_media_manager": {
+            "status": "on_track",
+            "tasks_completed": 62,
+            "completion_rate": "100%",
+            "quality_score": 9.1,
+            "key_achievements": ["12% engagement increase", "LinkedIn follower growth 8%"]
+        },
+        "campaign_manager": {
+            "status": "at_risk",
+            "tasks_completed": 28,
+            "completion_rate": "82%",
+            "quality_score": 8.5,
+            "key_achievements": ["Q4 campaign launched"],
+            "concerns": ["Team at 90% capacity", "2 campaigns delayed"]
+        }
+    },
+    "operational_metrics": {
+        "campaigns_approved": 5,
+        "campaigns_rejected": 1,
+        "avg_approval_time_hours": 18.5,
+        "content_pieces_published": 12,
+        "escalations_to_cmo": 2,
+        "team_avg_utilization": "78%",
+        "cross_team_collaboration_score": 8.4
+    },
+    "budget_status": {
+        "allocated_budget_period": 125000,
+        "spent_to_date": 87500,
+        "remaining": 37500,
+        "burn_rate": "on_track",
+        "projected_end_of_period": 122000
+    },
+    "campaigns_status": [
+        {
+            "campaign_name": "Q4 Product Launch",
+            "status": "active",
+            "progress": "75%",
+            "performance_vs_goals": "+15%",
+            "budget_utilization": "70%"
+        },
+        {
+            "campaign_name": "Thought Leadership Series",
+            "status": "planning",
+            "progress": "30%",
+            "performance_vs_goals": "N/A",
+            "budget_utilization": "20%"
+        }
+    ],
+    "recommendations_for_cmo": [
+        "Approve additional contractor support for Campaign Manager team",
+        "Consider accelerating Q4 campaign budget based on strong early performance",
+        "Review approval workflow to reduce bottleneck identified this week"
+    ],
+    "upcoming_decisions_needed": [
+        {
+            "decision": "Q1 2026 planning kickoff timing",
+            "deadline": "2025-11-15",
+            "impact": "high"
+        },
+        {
+            "decision": "Holiday campaign budget allocation",
+            "deadline": "2025-11-10",
+            "impact": "medium"
+        }
+    ],
+    "report_generated_at": "2025-11-03T17:00:00Z",
+    "report_generated_by": "vp_marketing_001"
+}
+```
+
+**Implementation:**
+```python
+async def _report_status(self, task: Task) -> dict[str, Any]:
+    """
+    Generate operational status reports for CMO.
+
+    WHY: Keep executive leadership informed of operational status and needs.
+    HOW: Aggregates data from all teams, analyzes trends, generates insights and recommendations.
+    """
+    report_type = task.parameters["report_type"]
+    report_period = task.parameters["report_period"]
+    include_sections = task.parameters.get("include_sections", [])
+
+    try:
+        # Collect data from all management teams
+        team_data = await self._collect_team_status_data(report_period)
+
+        # Generate executive summary
+        executive_summary = await self._generate_executive_summary(
+            team_data=team_data,
+            report_period=report_period
+        )
+
+        # Summarize team performance
+        team_performance_summary = self._summarize_team_performance(team_data)
+
+        # Calculate operational metrics
+        operational_metrics = self._calculate_report_operational_metrics(
+            team_data=team_data,
+            report_period=report_period
+        )
+
+        # Get budget status
+        budget_status = await self._get_budget_status(report_period)
+
+        # Summarize campaign status
+        campaigns_status = await self._summarize_campaigns_status()
+
+        # Generate recommendations for CMO
+        recommendations = self._generate_cmo_recommendations(
+            team_performance=team_performance_summary,
+            operational_metrics=operational_metrics,
+            budget_status=budget_status
+        )
+
+        # Identify upcoming decisions needed
+        upcoming_decisions = self._identify_upcoming_decisions()
+
+        report = {
+            "report_type": report_type,
+            "report_period": report_period,
+            "executive_summary": executive_summary,
+            "team_performance_summary": team_performance_summary,
+            "operational_metrics": operational_metrics,
+            "budget_status": budget_status,
+            "campaigns_status": campaigns_status,
+            "recommendations_for_cmo": recommendations,
+            "upcoming_decisions_needed": upcoming_decisions,
+            "report_generated_at": datetime.now().isoformat(),
+            "report_generated_by": self.agent_id
+        }
+
+        self.logger.info(
+            f"Status report generated: {report_type}",
+            extra={
+                "period": f"{report_period['start_date']} to {report_period['end_date']}",
+                "overall_status": executive_summary["overall_status"]
+            }
+        )
+
+        return report
+
+    except Exception as e:
+        raise AgentExecutionError(
+            agent_id=self.agent_id,
+            task_id=task.task_id,
+            message=f"Failed to generate status report: {str(e)}",
+            original_exception=e
+        )
+```
+
+#### Task Type 9: Allocate Resources
+
+**Purpose:** Manage tactical resource allocation within CMO-approved budgets and team capacity.
+
+**Parameters:**
+- `resource_type` (str): Type of resource (e.g., "budget", "team_capacity", "specialist_time")
+- `allocation_period` (dict): Start and end dates for allocation
+- `allocation_requests` (list[dict]): Resource requests from teams
+- `allocation_constraints` (dict, optional): Budget limits, capacity limits
+
+**Returns:**
+```python
+{
+    "resource_type": "team_capacity",
+    "allocation_period": {
+        "start_date": "2025-11-04",
+        "end_date": "2025-11-10"
+    },
+    "total_available": {
+        "content_manager": "40 hours",
+        "social_media_manager": "40 hours",
+        "campaign_manager": "40 hours",
+        "copywriter_specialist": "40 hours",
+        "designer_specialist": "40 hours"
+    },
+    "allocations": [
+        {
+            "request_id": "req_101",
+            "requesting_team": "campaign_manager",
+            "resource": "designer_specialist",
+            "requested_amount": "24 hours",
+            "allocated_amount": "20 hours",
+            "rationale": "Q4 campaign priority, but sharing required with Content team",
+            "allocation_period": "Mon-Wed full days",
+            "status": "approved_with_modification"
+        },
+        {
+            "request_id": "req_102",
+            "requesting_team": "content_manager",
+            "resource": "designer_specialist",
+            "requested_amount": "20 hours",
+            "allocated_amount": "16 hours",
+            "rationale": "Blog visuals needed, sharing with Campaign team",
+            "allocation_period": "Thu-Fri",
+            "status": "approved_with_modification"
+        }
+    ],
+    "allocation_summary": {
+        "total_requests": 2,
+        "approved": 2,
+        "approved_with_modification": 2,
+        "rejected": 0,
+        "utilization": {
+            "designer_specialist": "90%",
+            "copywriter_specialist": "60%"
+        }
+    },
+    "conflicts_resolved": [
+        {
+            "conflict": "Both Campaign and Content teams requested Designer full-time",
+            "resolution": "Time-sharing: Campaign Mon-Wed, Content Thu-Fri"
+        }
+    ],
+    "allocation_constraints_status": {
+        "within_budget": True,
+        "within_capacity": True,
+        "requires_cmo_approval": False
+    },
+    "allocation_timestamp": "2025-11-03T10:30:00Z"
+}
+```
+
+**Implementation:**
+```python
+async def _allocate_resources(self, task: Task) -> dict[str, Any]:
+    """
+    Manage tactical resource allocation within approved budgets.
+
+    WHY: Optimize resource utilization and resolve allocation conflicts.
+    HOW: Evaluates requests, applies constraints, resolves conflicts, allocates resources.
+    """
+    resource_type = task.parameters["resource_type"]
+    allocation_period = task.parameters["allocation_period"]
+    allocation_requests = task.parameters["allocation_requests"]
+    allocation_constraints = task.parameters.get("allocation_constraints", {})
+
+    try:
+        # Determine total available resources
+        total_available = await self._calculate_available_resources(
+            resource_type=resource_type,
+            period=allocation_period
+        )
+
+        # Validate requests against constraints
+        validated_requests = self._validate_allocation_requests(
+            requests=allocation_requests,
+            constraints=allocation_constraints,
+            available=total_available
+        )
+
+        # Prioritize requests
+        prioritized_requests = self._prioritize_allocation_requests(validated_requests)
+
+        # Identify conflicts
+        conflicts = self._identify_allocation_conflicts(prioritized_requests)
+
+        # Resolve conflicts
+        resolved_allocations = await self._resolve_allocation_conflicts(
+            requests=prioritized_requests,
+            conflicts=conflicts,
+            available=total_available
+        )
+
+        # Check if CMO approval needed
+        constraints_status = self._check_allocation_constraints(
+            allocations=resolved_allocations,
+            constraints=allocation_constraints
+        )
+
+        # Guard clause: Escalate to CMO if constraints exceeded
+        if constraints_status.get("requires_cmo_approval"):
+            return await self._escalate_allocation_to_cmo(
+                resource_type=resource_type,
+                allocation_period=allocation_period,
+                allocations=resolved_allocations,
+                reason="Allocation exceeds VP approval threshold"
+            )
+
+        # Apply allocations
+        await self._apply_resource_allocations(resolved_allocations)
+
+        # Calculate utilization
+        utilization = self._calculate_resource_utilization(
+            allocated=resolved_allocations,
+            available=total_available
+        )
+
+        result = {
+            "resource_type": resource_type,
+            "allocation_period": allocation_period,
+            "total_available": total_available,
+            "allocations": resolved_allocations,
+            "allocation_summary": {
+                "total_requests": len(allocation_requests),
+                "approved": len([a for a in resolved_allocations if "approved" in a["status"]]),
+                "utilization": utilization
+            },
+            "conflicts_resolved": conflicts,
+            "allocation_constraints_status": constraints_status,
+            "allocation_timestamp": datetime.now().isoformat()
+        }
+
+        self.logger.info(
+            f"Resources allocated: {resource_type}",
+            extra={
+                "requests_count": len(allocation_requests),
+                "approved_count": result["allocation_summary"]["approved"]
+            }
+        )
+
+        return result
+
+    except Exception as e:
+        raise AgentExecutionError(
+            agent_id=self.agent_id,
+            task_id=task.task_id,
+            message=f"Failed to allocate resources: {str(e)}",
+            original_exception=e
+        )
+```
+
+#### Task Type 10: Evaluate Team Performance
+
+**Purpose:** Evaluate management agent effectiveness and identify improvement opportunities.
+
+**Parameters:**
+- `evaluation_period` (dict): Start and end dates for evaluation
+- `teams` (list[str]): Teams to evaluate
+- `evaluation_criteria` (list[str], optional): Specific criteria to assess
+
+**Returns:**
+```python
+{
+    "evaluation_period": {
+        "start_date": "2025-10-01",
+        "end_date": "2025-10-31"
+    },
+    "team_evaluations": {
+        "content_manager": {
+            "overall_rating": 8.7,  # 0-10
+            "performance_areas": {
+                "task_completion": {"score": 9.2, "trend": "improving"},
+                "quality": {"score": 8.8, "trend": "stable"},
+                "collaboration": {"score": 8.5, "trend": "improving"},
+                "innovation": {"score": 8.0, "trend": "stable"},
+                "efficiency": {"score": 9.0, "trend": "improving"}
+            },
+            "strengths": [
+                "Consistently high quality content output",
+                "Excellent collaboration with Social Media team",
+                "Improved efficiency - 20% faster turnaround times"
+            ],
+            "areas_for_improvement": [
+                "Could increase proactive content ideation",
+                "SEO optimization scores could be higher"
+            ],
+            "achievements": [
+                "Published 42 high-quality content pieces",
+                "Maintained 94% on-time delivery rate",
+                "Improved brand voice consistency scores by 15%"
+            ],
+            "recommendations": [
+                "Provide additional SEO training",
+                "Encourage more proactive content strategy input"
+            ]
+        },
+        "social_media_manager": {
+            "overall_rating": 9.1,
+            "performance_areas": {
+                "task_completion": {"score": 9.5, "trend": "stable"},
+                "quality": {"score": 9.2, "trend": "improving"},
+                "collaboration": {"score": 9.0, "trend": "stable"},
+                "innovation": {"score": 8.8, "trend": "improving"},
+                "efficiency": {"score": 9.2, "trend": "stable"}
+            },
+            "strengths": [
+                "Outstanding engagement results - 25% increase",
+                "Highly responsive to trends and opportunities",
+                "Excellent cross-platform strategy"
+            ],
+            "areas_for_improvement": [
+                "Could improve documentation of successful tactics"
+            ],
+            "achievements": [
+                "Grew LinkedIn followers by 18%",
+                "Achieved 25% engagement increase across platforms",
+                "Successfully launched 3 viral campaigns"
+            ],
+            "recommendations": [
+                "Document best practices for knowledge sharing",
+                "Consider leading social media training for team"
+            ]
+        },
+        "campaign_manager": {
+            "overall_rating": 8.3,
+            "performance_areas": {
+                "task_completion": {"score": 8.0, "trend": "declining"},
+                "quality": {"score": 8.5, "trend": "stable"},
+                "collaboration": {"score": 8.2, "trend": "stable"},
+                "innovation": {"score": 8.5, "trend": "improving"},
+                "efficiency": {"score": 8.0, "trend": "declining"}
+            },
+            "strengths": [
+                "Strong strategic campaign planning",
+                "Good cross-channel coordination",
+                "Innovative campaign concepts"
+            ],
+            "areas_for_improvement": [
+                "Team capacity constraints affecting delivery",
+                "Task completion rate declining (82% from 90%)",
+                "Need better workload management"
+            ],
+            "achievements": [
+                "Launched 5 successful campaigns",
+                "Q4 campaign exceeding targets by 15%",
+                "Improved multi-channel coordination"
+            ],
+            "recommendations": [
+                "Investigate resource constraints and address",
+                "Consider additional team support or process improvements",
+                "Implement workload balancing strategies"
+            ]
+        }
+    },
+    "team_comparison": {
+        "highest_performer": "social_media_manager",
+        "most_improved": "content_manager",
+        "needs_attention": "campaign_manager",
+        "average_team_rating": 8.7
+    },
+    "organizational_insights": [
+        "Overall team performance is strong (8.7 average)",
+        "Campaign Manager team facing capacity constraints - recommend addressing",
+        "Social Media and Content teams showing excellent collaboration",
+        "Trend toward improved efficiency across Content and Social teams"
+    ],
+    "action_items": [
+        {
+            "priority": "high",
+            "action": "Address Campaign Manager capacity constraints",
+            "owner": "vp_marketing",
+            "timeline": "within_2_weeks"
+        },
+        {
+            "priority": "medium",
+            "action": "Provide SEO training for Content team",
+            "owner": "vp_marketing",
+            "timeline": "within_1_month"
+        }
+    ],
+    "evaluation_completed_at": "2025-11-03T11:00:00Z"
+}
+```
+
+**Implementation:**
+```python
+async def _evaluate_team_performance(self, task: Task) -> dict[str, Any]:
+    """
+    Evaluate management agent effectiveness.
+
+    WHY: Identify high performers, improvement opportunities, and resource needs.
+    HOW: Analyzes performance data, compares against criteria, generates insights.
+    """
+    evaluation_period = task.parameters["evaluation_period"]
+    teams = task.parameters["teams"]
+    evaluation_criteria = task.parameters.get(
+        "evaluation_criteria",
+        ["task_completion", "quality", "collaboration", "innovation", "efficiency"]
+    )
+
+    try:
+        team_evaluations = {}
+
+        # Evaluate each team
+        for team in teams:
+            # Collect performance data
+            performance_data = await self._collect_performance_data(
+                team=team,
+                period=evaluation_period
+            )
+
+            # Score against each criterion
+            performance_areas = {}
+            for criterion in evaluation_criteria:
+                score = await self._score_performance_area(
+                    team=team,
+                    criterion=criterion,
+                    data=performance_data
+                )
+                performance_areas[criterion] = score
+
+            # Calculate overall rating
+            overall_rating = self._calculate_overall_rating(performance_areas)
+
+            # Identify strengths and areas for improvement
+            strengths = self._identify_strengths(performance_areas, performance_data)
+            areas_for_improvement = self._identify_improvement_areas(
+                performance_areas,
+                performance_data
+            )
+
+            # List achievements
+            achievements = self._list_achievements(performance_data)
+
+            # Generate recommendations
+            recommendations = self._generate_team_recommendations(
+                performance_areas=performance_areas,
+                areas_for_improvement=areas_for_improvement
+            )
+
+            team_evaluations[team] = {
+                "overall_rating": overall_rating,
+                "performance_areas": performance_areas,
+                "strengths": strengths,
+                "areas_for_improvement": areas_for_improvement,
+                "achievements": achievements,
+                "recommendations": recommendations
+            }
+
+        # Compare teams
+        team_comparison = self._compare_teams(team_evaluations)
+
+        # Generate organizational insights
+        organizational_insights = self._generate_organizational_insights(
+            team_evaluations=team_evaluations,
+            team_comparison=team_comparison
+        )
+
+        # Create action items
+        action_items = self._create_evaluation_action_items(
+            team_evaluations=team_evaluations,
+            organizational_insights=organizational_insights
+        )
+
+        result = {
+            "evaluation_period": evaluation_period,
+            "team_evaluations": team_evaluations,
+            "team_comparison": team_comparison,
+            "organizational_insights": organizational_insights,
+            "action_items": action_items,
+            "evaluation_completed_at": datetime.now().isoformat()
+        }
+
+        self.logger.info(
+            "Team performance evaluation completed",
+            extra={
+                "teams_evaluated": len(teams),
+                "average_rating": team_comparison["average_team_rating"]
+            }
+        )
+
+        return result
+
+    except Exception as e:
+        raise AgentExecutionError(
+            agent_id=self.agent_id,
+            task_id=task.task_id,
+            message=f"Failed to evaluate team performance: {str(e)}",
+            original_exception=e
+        )
+```
+
+#### State Management
+
+The VP Marketing Agent maintains comprehensive operational state:
+
+```python
+# Operational State Structure
+{
+    # Pending approvals queue
+    "pending_approvals": [
+        {
+            "campaign_id": "camp_123",
+            "submitted_at": "2025-11-03T09:00:00Z",
+            "submitted_by": "campaign_manager",
+            "priority": "high",
+            "review_deadline": "2025-11-04T17:00:00Z"
+        }
+    ],
+
+    # Active sprint tracking
+    "current_sprint": {
+        "sprint_id": "sprint_47",
+        "sprint_name": "Week of Nov 4",
+        "start_date": "2025-11-04",
+        "end_date": "2025-11-10",
+        "goals": [...],
+        "team_allocations": {...},
+        "status": "active"
+    },
+
+    # Team workload and capacity
+    "team_workload": {
+        "content_manager": {
+            "current_capacity": "80%",
+            "active_tasks": 12,
+            "utilization": "75%",
+            "available_hours": 8,
+            "status": "healthy"
+        },
+        "social_media_manager": {
+            "current_capacity": "90%",
+            "active_tasks": 8,
+            "utilization": "60%",
+            "available_hours": 16,
+            "status": "healthy"
+        },
+        "campaign_manager": {
+            "current_capacity": "75%",
+            "active_tasks": 15,
+            "utilization": "90%",
+            "available_hours": 4,
+            "status": "at_capacity"
+        }
+    },
+
+    # Escalations to CMO
+    "escalations": [
+        {
+            "escalation_id": "esc_001",
+            "type": "budget_overrun",
+            "escalated_at": "2025-11-02T14:00:00Z",
+            "status": "pending_cmo_decision",
+            "resolution_needed_by": "2025-11-05T17:00:00Z"
+        }
+    ],
+
+    # Operational metrics dashboard
+    "operational_metrics": {
+        "campaigns_approved": 45,
+        "campaigns_rejected": 8,
+        "escalations_to_cmo": 5,
+        "avg_approval_time_hours": 18.5,
+        "team_coordination_score": 8.4,
+        "overall_team_utilization": "75%",
+        "quality_score": 8.7
+    },
+
+    # Active coordinations
+    "active_coordinations": [
+        {
+            "initiative_id": "init_123",
+            "initiative_name": "Q4 Product Launch",
+            "teams": ["content", "social", "campaign"],
+            "status": "in_progress",
+            "next_checkpoint": "2025-11-05"
+        }
+    ]
+}
+```
+
+#### Decision Framework
+
+**Campaign Approval Criteria:**
+
+```python
+def _evaluate_campaign_proposal(
+    self,
+    campaign_data: dict[str, Any],
+    review_criteria: list[str]
+) -> dict[str, Any]:
+    """
+    Evaluate campaign against approval criteria.
+
+    WHY: Ensure consistent, objective campaign approval decisions.
+    HOW: Scores campaign on multiple dimensions, applies thresholds.
+
+    Approval Criteria:
+    1. Strategic Alignment (weight: 30%)
+       - Aligns with CMO strategy
+       - Supports company objectives
+       - Fits target audience
+
+    2. Budget Fit (weight: 25%)
+       - Within allocated budget
+       - ROI projections realistic
+       - Cost-effectiveness acceptable
+
+    3. Resource Availability (weight: 25%)
+       - Team capacity available
+       - Specialist resources available
+       - Timeline feasible
+
+    4. Risk Assessment (weight: 20%)
+       - Brand safety acceptable
+       - Technical feasibility confirmed
+       - Market timing appropriate
+
+    Approval Thresholds:
+    - AUTO-APPROVE: Overall score >= 8.0 and no criteria < 7.0
+    - APPROVE WITH CONDITIONS: Overall score >= 7.0 and no criteria < 6.0
+    - ESCALATE TO CMO: Budget > $50k OR duration > 90 days OR strategic uncertainty
+    - REJECT: Overall score < 7.0 OR any criteria < 6.0
+    """
+```
+
+**Escalation Triggers:**
+
+```python
+def _should_escalate_to_cmo(
+    self,
+    campaign_data: dict[str, Any],
+    evaluation: dict[str, Any]
+) -> bool:
+    """
+    Determine if campaign should be escalated to CMO.
+
+    WHY: Ensure appropriate decision authority and risk management.
+    HOW: Checks campaign against predefined thresholds.
+
+    Escalation Triggers:
+    - Campaign budget exceeds $50,000 (VP approval limit)
+    - Campaign duration exceeds 90 days (strategic timeline)
+    - Team capacity utilization would exceed 85%
+    - Strategic alignment score < 7.0 (strategic uncertainty)
+    - Risk assessment identifies high-severity risks
+    - Requires resources not within VP authority
+    - Cross-department coordination required (e.g., Product, Sales)
+    - Novel campaign type without precedent
+    """
+```
+
+**Priority Setting Methodology:**
+
+```python
+def _rank_priority_items(
+    self,
+    items: list[dict[str, Any]],
+    criteria: list[str],
+    period: dict[str, Any]
+) -> list[dict[str, Any]]:
+    """
+    Rank priority items for tactical planning.
+
+    WHY: Optimize resource allocation toward highest-impact activities.
+    HOW: Multi-criteria scoring with weighted factors.
+
+    Prioritization Criteria:
+    1. Strategic Importance (weight: 35%)
+       - CMO-designated priorities
+       - Company OKR alignment
+       - Revenue impact potential
+
+    2. Urgency (weight: 30%)
+       - Deadline proximity
+       - Time-sensitive opportunities
+       - Blocking other work
+
+    3. Resource Efficiency (weight: 20%)
+       - Effort-to-impact ratio
+       - Available resources match
+       - No resource conflicts
+
+    4. Risk/Opportunity (weight: 15%)
+       - Risk of not doing
+       - Opportunity cost
+       - Market timing
+
+    Priority Levels:
+    - CRITICAL: Score >= 9.0 - Must complete this period
+    - HIGH: Score >= 7.5 - Should complete this period
+    - MEDIUM: Score >= 6.0 - Complete if capacity allows
+    - LOW: Score < 6.0 - Defer to next period
+    """
+```
+
+#### Integration Points
+
+**Reporting Relationship:**
+
+```
+CMO Agent (Executive Layer)
+    │
+    └─> VP Marketing Agent (Executive Layer - Operational)
+            │
+            ├─> Content Manager (Management Layer)
+            │       ├─> Copywriter Specialist
+            │       ├─> SEO Specialist
+            │       └─> Designer Specialist
+            │
+            ├─> Social Media Manager (Management Layer)
+            │       └─> Social Media Specialist
+            │
+            └─> Campaign Manager (Management Layer)
+                    └─> Analytics Specialist
+```
+
+**Collaboration with Executive Layer:**
+
+```python
+# VP Marketing → CMO (Escalation)
+vp_marketing -> cmo_agent.request_approval(
+    approval_type="campaign",
+    campaign_id="camp_large_123",
+    reason="Budget exceeds VP approval threshold ($75k)"
+)
+
+# CMO → VP Marketing (Strategy Delegation)
+cmo_agent -> vp_marketing.implement_strategy(
+    strategy_document={...},
+    quarterly_goals=[...],
+    budget_allocation={...}
+)
+
+# VP Marketing → CMO (Status Reporting)
+vp_marketing -> cmo_agent.submit_report(
+    report_type="weekly_operational_status",
+    report_data={...}
+)
+```
+
+**Coordination with Management Layer:**
+
+```python
+# VP Marketing → Content Manager (Priority Assignment)
+vp_marketing -> content_manager.assign_priorities(
+    priority_items=[
+        {"content_type": "blog", "priority": "high", "deadline": "2025-11-08"}
+    ]
+)
+
+# Content Manager → VP Marketing (Approval Request)
+content_manager -> vp_marketing.request_content_approval(
+    content_id="cont_456",
+    content_type="case_study"
+)
+
+# VP Marketing → Campaign Manager (Campaign Approval)
+campaign_manager -> vp_marketing.request_campaign_approval(
+    campaign_id="camp_789"
+)
+vp_marketing -> campaign_manager.approve_campaign(
+    campaign_id="camp_789",
+    approval_decision="approved"
+)
+
+# VP Marketing → Social Media Manager (Resource Allocation)
+vp_marketing -> social_media_manager.allocate_resources(
+    resource_type="designer_time",
+    allocation="16 hours Thu-Fri"
+)
+```
+
+**Cross-Functional Collaboration:**
+
+```python
+# VP Marketing → Director of Communications (Brand Alignment)
+vp_marketing -> director_of_communications.review_brand_alignment(
+    content_ids=["cont_123", "cont_456"],
+    campaign_ids=["camp_789"]
+)
+
+# VP Marketing → Analytics Specialist (Operational Metrics)
+vp_marketing -> analytics_specialist.get_operational_metrics(
+    metrics=["team_utilization", "campaign_performance", "content_engagement"],
+    period={"start_date": "2025-11-01", "end_date": "2025-11-03"}
+)
+
+# VP Marketing → Market Research (Tactical Insights)
+vp_marketing -> market_research.get_competitive_update(
+    competitors=["Competitor A", "Competitor B"],
+    focus_area="recent_campaigns"
+)
+```
+
+#### Collaboration Patterns
+
+**Pattern 1: CMO Strategy → VP Marketing Tactical Execution**
+
+```python
+# CMO defines Q4 strategy
+cmo_agent -> vp_marketing.implement_quarterly_strategy(
+    strategy={
+        "objectives": ["Grow enterprise segment by 20%", "Launch new product"],
+        "budget_allocation": {"campaigns": 200000, "content": 75000, "social": 50000},
+        "priorities": ["Product launch campaign", "Enterprise content series"]
+    }
+)
+
+# VP Marketing breaks down into sprints
+vp_marketing -> plan_sprint(
+    sprint_name="Q4 Week 1 - Launch Prep",
+    sprint_goals=[
+        "Finalize product launch campaign plan",
+        "Begin enterprise content series"
+    ]
+)
+
+# VP Marketing coordinates management teams
+vp_marketing -> coordinate_teams(
+    initiative_name="Product Launch",
+    involved_teams=["campaign", "content", "social"],
+    timeline={"start_date": "2025-11-04", "end_date": "2025-11-15"}
+)
+
+# VP Marketing monitors execution
+vp_marketing -> monitor_operations(
+    monitoring_scope="daily",
+    teams=["campaign", "content", "social"]
+)
+
+# VP Marketing reports back to CMO
+vp_marketing -> cmo_agent.submit_report(
+    report_type="weekly",
+    report_data={
+        "status": "on_track",
+        "highlights": ["Campaign plan approved", "Content production ahead of schedule"],
+        "challenges": ["Designer resource constraint"]
+    }
+)
+```
+
+**Pattern 2: Campaign Approval Workflow**
+
+```python
+# Campaign Manager submits campaign for approval
+campaign_manager -> vp_marketing.request_campaign_approval(
+    campaign_id="camp_q4_launch",
+    campaign_data={
+        "name": "Q4 Product Launch Campaign",
+        "budget": 45000,
+        "duration_days": 60,
+        "channels": ["linkedin", "email", "blog"]
+    }
+)
+
+# VP Marketing evaluates campaign
+evaluation = vp_marketing._evaluate_campaign_proposal(campaign_data)
+
+# Scenario A: Within VP authority - approve directly
+if evaluation["within_vp_authority"]:
+    vp_marketing -> campaign_manager.approve_campaign(
+        campaign_id="camp_q4_launch",
+        decision="approved",
+        conditions=["Weekly status updates required"]
+    )
+
+# Scenario B: Exceeds thresholds - escalate to CMO
+if evaluation["requires_cmo_approval"]:
+    vp_marketing -> cmo_agent.request_approval(
+        approval_type="campaign",
+        campaign_id="camp_q4_launch",
+        vp_recommendation="approve",
+        vp_analysis=evaluation
+    )
+
+    cmo_decision = await cmo_agent.make_decision(...)
+
+    vp_marketing -> campaign_manager.notify_approval_decision(
+        campaign_id="camp_q4_launch",
+        decision=cmo_decision
+    )
+```
+
+**Pattern 3: Resource Conflict Resolution**
+
+```python
+# Both Content and Campaign teams request Designer
+content_manager -> vp_marketing.request_resources(
+    resource_type="designer_time",
+    amount="40 hours",
+    priority="high",
+    justification="Enterprise content series visuals"
+)
+
+campaign_manager -> vp_marketing.request_resources(
+    resource_type="designer_time",
+    amount="40 hours",
+    priority="critical",
+    justification="Product launch campaign assets"
+)
+
+# VP Marketing identifies conflict
+conflict = vp_marketing._identify_allocation_conflicts([...])
+
+# VP Marketing resolves conflict
+vp_marketing -> resolve_conflicts(
+    conflict_type="resource",
+    involved_teams=["content_manager", "campaign_manager"],
+    conflict_description="Both teams need Designer full-time"
+)
+
+# VP Marketing negotiates resolution
+resolution = {
+    "approach": "time_sharing",
+    "allocation": {
+        "campaign_manager": "Mon-Wed (24 hours)",
+        "content_manager": "Thu-Fri (16 hours)"
+    }
+}
+
+# VP Marketing implements resolution
+vp_marketing -> content_manager.notify_resource_allocation(allocation={...})
+vp_marketing -> campaign_manager.notify_resource_allocation(allocation={...})
+vp_marketing -> designer_specialist.update_schedule(schedule={...})
+```
+
+**Pattern 4: Sprint Planning and Coordination**
+
+```python
+# Beginning of week - VP Marketing plans sprint
+vp_marketing -> plan_sprint(
+    sprint_name="Week of Nov 4",
+    sprint_duration_days=7,
+    sprint_goals=[
+        "Launch Q4 campaign",
+        "Publish 3 blog posts",
+        "Increase LinkedIn engagement"
+    ]
+)
+
+# VP Marketing assigns priorities to teams
+vp_marketing -> assign_priorities(
+    priority_scope="weekly",
+    priority_items=[
+        {"type": "campaign", "id": "camp_123", "priority": "critical"},
+        {"type": "content", "id": "cont_456", "priority": "high"}
+    ]
+)
+
+# Daily standup coordination
+daily:
+    vp_marketing -> monitor_operations(monitoring_scope="daily")
+
+    if issues_identified:
+        vp_marketing -> resolve_conflicts(...) or escalate_to_cmo(...)
+
+# End of sprint - VP Marketing reviews
+vp_marketing -> evaluate_team_performance(
+    evaluation_period={"start_date": "2025-11-04", "end_date": "2025-11-10"}
+)
+
+# VP Marketing reports to CMO
+vp_marketing -> report_status(
+    report_type="weekly",
+    report_period=sprint_period
+)
+```
+
+**Pattern 5: Content Review and Approval**
+
+```python
+# Content Manager submits content for VP review
+content_manager -> vp_marketing.request_content_approval(
+    content_id="cont_enterprise_guide",
+    content_type="whitepaper",
+    expedited=False
+)
+
+# VP Marketing reviews content
+vp_marketing -> review_content(
+    content_id="cont_enterprise_guide",
+    review_type="full"
+)
+
+review_result = {
+    "decision": "approved_with_changes",
+    "quality_scores": {"brand_alignment": 8.5, "readability": 9.0},
+    "required_changes": [
+        {"section": "Introduction", "issue": "...", "recommendation": "..."}
+    ]
+}
+
+# VP Marketing sends back to Content Manager
+vp_marketing -> content_manager.request_revisions(
+    content_id="cont_enterprise_guide",
+    revisions=review_result["required_changes"]
+)
+
+# After revisions - final approval
+content_manager -> vp_marketing.request_final_approval(content_id="cont_enterprise_guide")
+vp_marketing -> content_manager.grant_final_approval(content_id="cont_enterprise_guide")
+```
+
+#### Architecture Compliance
+
+The VP Marketing Agent follows all architecture standards:
+
+**Strategy Pattern (Zero if/elif chains):**
+```python
+# ✅ CORRECT: Strategy Pattern with dictionary dispatch
+self._task_handlers = {
+    "coordinate_teams": self._coordinate_teams,
+    "approve_campaign": self._approve_campaign,
+    "assign_priorities": self._assign_priorities,
+    "review_content": self._review_content,
+    "monitor_operations": self._monitor_operations,
+    "resolve_conflicts": self._resolve_conflicts,
+    "plan_sprint": self._plan_sprint,
+    "report_status": self._report_status,
+    "allocate_resources": self._allocate_resources,
+    "evaluate_team_performance": self._evaluate_team_performance,
+}
+
+handler = self._task_handlers.get(task.task_type)
+result = await handler(task)
+
+# ❌ WRONG: if/elif chains
+if task.task_type == "coordinate_teams":
+    result = await self._coordinate_teams(task)
+elif task.task_type == "approve_campaign":
+    result = await self._approve_campaign(task)
+# ... more elif statements
+```
+
+**Guard Clauses (No nested ifs):**
+```python
+# ✅ CORRECT: Guard clauses with early returns
+async def _approve_campaign(self, task: Task) -> dict[str, Any]:
+    campaign_id = task.parameters["campaign_id"]
+
+    # Guard clause: Verify Campaign Manager available
+    if not self._campaign_manager:
+        return {"error": "Campaign Manager not available"}
+
+    # Guard clause: Fetch campaign data
+    campaign_data = await self._fetch_campaign_details(campaign_id)
+    if not campaign_data:
+        return {"error": f"Campaign not found: {campaign_id}"}
+
+    # Guard clause: Check escalation to CMO
+    evaluation = await self._evaluate_campaign_proposal(campaign_data)
+    if self._should_escalate_to_cmo(campaign_data, evaluation):
+        return await self._escalate_to_cmo(campaign_id, evaluation)
+
+    # Main logic
+    approval_decision = self._make_approval_decision(evaluation)
+    return approval_decision
+
+# ❌ WRONG: Nested if statements
+async def _approve_campaign(self, task: Task) -> dict[str, Any]:
+    if self._campaign_manager:
+        campaign_data = await self._fetch_campaign_details(campaign_id)
+        if campaign_data:
+            evaluation = await self._evaluate_campaign_proposal(campaign_data)
+            if not self._should_escalate_to_cmo(campaign_data, evaluation):
+                approval_decision = self._make_approval_decision(evaluation)
+                return approval_decision
+```
+
+**Full Type Hints:**
+```python
+# ✅ CORRECT: Complete type annotations
+async def _coordinate_teams(
+    self,
+    task: Task
+) -> dict[str, Any]:
+    """Coordinate activities across management-layer teams."""
+    initiative_name: str = task.parameters["initiative_name"]
+    involved_teams: list[str] = task.parameters["involved_teams"]
+
+    coordination_plan: dict[str, Any] = await self._create_coordination_plan(
+        initiative_name=initiative_name,
+        teams=involved_teams
+    )
+
+    return coordination_plan
+
+# ❌ WRONG: Missing type hints
+async def _coordinate_teams(self, task):
+    initiative_name = task.parameters["initiative_name"]
+    involved_teams = task.parameters["involved_teams"]
+    coordination_plan = await self._create_coordination_plan(initiative_name, involved_teams)
+    return coordination_plan
+```
+
+**WHY/HOW Documentation:**
+```python
+# ✅ CORRECT: WHY/HOW docstrings
+async def _plan_sprint(self, task: Task) -> dict[str, Any]:
+    """
+    Plan weekly/sprint-level marketing activities.
+
+    WHY: Organize work into manageable sprints with clear goals and capacity planning.
+    HOW: Analyzes goals, allocates tasks to teams, manages capacity, tracks dependencies.
+    """
+
+# ❌ WRONG: Generic docstring
+async def _plan_sprint(self, task: Task) -> dict[str, Any]:
+    """Plan a sprint."""
+```
+
+**Exception Wrapping:**
+```python
+# ✅ CORRECT: Wrap with AgentExecutionError
+try:
+    result = await self._coordinate_teams_implementation(task)
+    return result
+except Exception as e:
+    raise AgentExecutionError(
+        agent_id=self.agent_id,
+        task_id=task.task_id,
+        message=f"Failed to coordinate teams: {str(e)}",
+        original_exception=e
+    )
+
+# ❌ WRONG: Let exceptions propagate
+result = await self._coordinate_teams_implementation(task)
+return result
+```
+
+#### Performance Metrics
+
+The VP Marketing Agent tracks key operational performance indicators:
+
+```python
+# Operational Metrics
+{
+    "team_coordination": {
+        "coordination_effectiveness": 8.4,  # 0-10
+        "cross_team_initiatives_active": 5,
+        "coordination_conflicts_resolved": 12,
+        "avg_coordination_setup_time_hours": 2.3
+    },
+
+    "approval_efficiency": {
+        "campaigns_approved": 45,
+        "campaigns_rejected": 8,
+        "campaigns_escalated_to_cmo": 5,
+        "avg_approval_time_hours": 18.5,
+        "approval_sla_met_percentage": 92
+    },
+
+    "team_performance": {
+        "avg_team_utilization": 75,  # percentage
+        "avg_team_quality_score": 8.7,
+        "avg_task_completion_rate": 91,  # percentage
+        "teams_exceeding_capacity": 0,
+        "teams_at_risk": 1
+    },
+
+    "escalations": {
+        "total_escalations_to_cmo": 5,
+        "escalation_rate": 8,  # percentage of decisions escalated
+        "avg_escalation_resolution_time_hours": 36,
+        "escalation_types": {
+            "budget": 2,
+            "strategic": 2,
+            "resource": 1
+        }
+    },
+
+    "sprint_management": {
+        "sprints_completed": 12,
+        "avg_sprint_goal_achievement": 87,  # percentage
+        "sprints_completed_on_time": 11,
+        "sprint_velocity_trend": "improving"
+    },
+
+    "operational_health": {
+        "overall_health_score": 8.2,  # 0-10
+        "active_issues": 3,
+        "high_priority_issues": 1,
+        "avg_issue_resolution_time_hours": 24
+    }
+}
+```
+
+#### Future Enhancements
+
+**Phase 1 (Short-term):**
+- Machine learning for workload prediction based on historical patterns
+- Automated campaign risk scoring using ML models
+- Real-time team capacity tracking dashboard
+- Integration with project management tools (Jira, Asana)
+
+**Phase 2 (Medium-term):**
+- Predictive resource allocation using demand forecasting
+- Automated priority optimization based on strategic goals
+- AI-powered conflict resolution suggestions
+- Team performance analytics with trend analysis
+
+**Phase 3 (Long-term):**
+- Autonomous sprint planning with minimal human oversight
+- Predictive escalation warnings (identify issues before they require escalation)
+- Cross-organizational resource optimization
+- Integration with VP Sales and VP Product for cross-functional coordination
+
+**Advanced Features:**
+- Natural language sprint planning ("Plan next week focusing on product launch")
+- Automated A/B testing for approval criteria optimization
+- Integration with calendar systems for automatic meeting scheduling
+- Slack/Teams integration for real-time team coordination
+
+---
+
 ## 5. Data Models
 
 ### 5.1 Core Entities
